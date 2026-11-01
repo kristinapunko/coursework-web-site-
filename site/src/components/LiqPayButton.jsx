@@ -45,11 +45,12 @@ const loadLiqPaySdk = () => {
 export const LIQPAY_UNAVAILABLE_MESSAGE =
     "Оплата LiqPay наразі недоступна. Будь ласка, спробуйте пізніше або зв'яжіться з менеджером.";
 
-const LiqPayButton = ({ bookingId, disabled }) => {
+const LiqPayButton = ({ bookingId, disabled, onPaymentComplete }) => {
     const [payment, setPayment] = useState(null);
     const [error, setError] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isOpening, setIsOpening] = useState(false);
+    const [isConfirming, setIsConfirming] = useState(false);
 
     useEffect(() => {
         if (disabled || !bookingId) {
@@ -100,15 +101,38 @@ const LiqPayButton = ({ bookingId, disabled }) => {
             });
 
             checkout
-                .on("liqpay.callback", (response) => {
+                .on("liqpay.callback", async (response) => {
                     const result = {
-                        status: response?.status,
+                        status: String(response?.status || "").toLowerCase(),
                         errorCode: response?.err_code,
                         errorDescription: response?.err_description,
                     };
                     console.info("LiqPay checkout response:", result);
                     if (result.errorCode || result.errorDescription) {
                         setError(result.errorDescription || LIQPAY_UNAVAILABLE_MESSAGE);
+                        return;
+                    }
+                    if (result.status === "success" || result.status === "sandbox") {
+                        setIsConfirming(true);
+                        try {
+                            await api.post(`/cabinet/api/pay-liqpay/${bookingId}/confirm/`, {
+                                data: payment.data,
+                                signature: payment.signature,
+                                status: result.status,
+                                order_id: response?.order_id,
+                                payment_id: response?.payment_id,
+                                amount: response?.amount,
+                            });
+                            await onPaymentComplete?.();
+                        } catch (confirmationError) {
+                            console.error("LiqPay payment confirmation failed:", confirmationError);
+                            setError(
+                                confirmationError.response?.data?.error || LIQPAY_UNAVAILABLE_MESSAGE
+                            );
+                        } finally {
+                            setIsConfirming(false);
+                            setIsOpening(false);
+                        }
                     }
                 })
                 .on("liqpay.ready", () => setIsOpening(false))
@@ -153,10 +177,10 @@ const LiqPayButton = ({ bookingId, disabled }) => {
             <button
                 type="button"
                 onClick={openCheckout}
-                disabled={isOpening}
+                disabled={isOpening || isConfirming}
                 className="w-full rounded-xl border-2 border-[#361d32]/60 px-4 py-2 hover:bg-[#543c52] hover:text-[#f1e8e6] disabled:cursor-wait disabled:opacity-60"
             >
-                {isOpening ? "Відкриття LiqPay..." : "Оплатити"}
+                {isConfirming ? "Підтвердження оплати..." : isOpening ? "Відкриття LiqPay..." : "Оплатити"}
             </button>
         </div>
     );

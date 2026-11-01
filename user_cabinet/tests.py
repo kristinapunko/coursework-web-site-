@@ -3,6 +3,7 @@ import hashlib
 import json
 import tempfile
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.conf import settings
@@ -159,6 +160,17 @@ class LiqPayCallbackTests(APITestCase):
         }
         return base64.b64encode(json.dumps(payload).encode()).decode()
 
+    def checkout_data(self, amount="1000.00"):
+        payload = {
+            "action": "pay",
+            "version": "3",
+            "public_key": settings.LIQPAY_PUBLIC_KEY,
+            "order_id": f"booking-{self.booking.id}",
+            "amount": amount,
+            "currency": "UAH",
+        }
+        return base64.b64encode(json.dumps(payload).encode()).decode()
+
     def test_checkout_payload_uses_sandbox_key_and_valid_signature(self):
         self.client.force_authenticate(self.user)
 
@@ -223,4 +235,66 @@ class LiqPayCallbackTests(APITestCase):
         self.payment.refresh_from_db()
         self.booking.refresh_from_db()
         self.assertTrue(self.payment.is_paid)
+        self.assertEqual(self.payment.liqpay_status, "success")
         self.assertEqual(self.booking.status, "confirmed")
+
+    @patch("user_cabinet.views.fetch_liqpay_payment_status")
+    def test_widget_confirmation_verifies_with_liqpay_and_confirms_booking(
+        self, fetch_status
+    ):
+        self.client.force_authenticate(self.user)
+        fetch_status.return_value = {
+            "order_id": f"booking-{self.booking.id}",
+            "payment_id": "payment-123",
+            "public_key": settings.LIQPAY_PUBLIC_KEY,
+            "status": "sandbox",
+            "amount": "1000.00",
+        }
+        data = self.checkout_data()
+
+        response = self.client.post(
+            reverse("liqpay-confirm", kwargs={"booking_id": self.booking.id}),
+            {
+                "data": data,
+                "signature": liqpay_signature(data),
+                "status": "sandbox",
+                "order_id": f"booking-{self.booking.id}",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        fetch_status.assert_called_once_with(f"booking-{self.booking.id}")
+        self.payment.refresh_from_db()
+        self.booking.refresh_from_db()
+        self.assertTrue(self.payment.is_paid)
+        self.assertEqual(self.payment.liqpay_status, "success")
+        self.assertEqual(self.booking.status, "confirmed")
+
+    @patch("user_cabinet.views.fetch_liqpay_payment_status")
+    def test_widget_confirmation_rejects_unconfirmed_provider_status(self, fetch_status):
+        self.client.force_authenticate(self.user)
+        fetch_status.return_value = {
+            "order_id": f"booking-{self.booking.id}",
+            "public_key": settings.LIQPAY_PUBLIC_KEY,
+            "status": "processing",
+            "amount": "1000.00",
+        }
+        data = self.checkout_data()
+
+        response = self.client.post(
+            reverse("liqpay-confirm", kwargs={"booking_id": self.booking.id}),
+            {
+                "data": data,
+                "signature": liqpay_signature(data),
+                "status": "sandbox",
+                "order_id": f"booking-{self.booking.id}",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.payment.refresh_from_db()
+        self.booking.refresh_from_db()
+        self.assertFalse(self.payment.is_paid)
+        self.assertEqual(self.booking.status, "pending")

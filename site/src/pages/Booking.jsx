@@ -47,6 +47,8 @@ const Booking = () => {
 
     };
 
+    const handlePaymentComplete = () => dispatch(fetchBookings());
+
     if (loading) return <Loading />;
     if (error) return <p>{error?.message || "Something went wrong"}</p>;
 
@@ -145,7 +147,11 @@ const Booking = () => {
                                             </button>
 
                                             <div className="flex-1">
-                                                <LiqPayButton bookingId={booking.id} disabled={booking.status !== 'pending'} />
+                                                <LiqPayButton
+                                                    bookingId={booking.id}
+                                                    disabled={booking.status !== 'pending'}
+                                                    onPaymentComplete={handlePaymentComplete}
+                                                />
                                             </div>
                                         </div>
                                     </div>
