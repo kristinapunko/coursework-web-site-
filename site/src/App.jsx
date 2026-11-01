@@ -79,9 +79,9 @@ const AuthLayout = ({ children }) => (
 
 const RequireAuth = ({ children }) => {
   const location = useLocation();
-  const { isLoggedIn, status } = useSelector((state) => state.auth);
+  const { initialized, isLoggedIn, status } = useSelector((state) => state.auth);
 
-  if (status === 'idle' || status === 'loading') {
+  if (!initialized || status === 'loading') {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
   if (!isLoggedIn) {

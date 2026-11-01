@@ -1,8 +1,4 @@
-import { useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import { setFilters } from '../features/tours/tourDetailsSlice';
-import { resetFilters as resetMainFilters } from '../features/tours/toursSlice';
-import { resetFilters as resetDetailsFilters } from '../features/tours/tourDetailsSlice';
+import { useTourFilterParams } from '../features/tours/filterParams';
 
 import extreme from '../assets/extreme.webp';
 import beach from '../assets/beach.webp';
@@ -77,22 +73,10 @@ const thematicTours = [
 ];
 
 const TourList = () => {
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
+  const { resetFilters } = useTourFilterParams();
 
   const handleThematicTourSelect = (filterField) => {
-    dispatch(resetMainFilters());
-    dispatch(resetDetailsFilters());
-    dispatch(setFilters({ 
-      thematicFilter: filterField,
-      beach_tour: filterField === 'beach_tour',
-      festivals: filterField === 'festivals',
-      winter_tour: filterField === 'winter_tour',
-      extreme_tour: filterField === 'extreme_tour',
-      natural_tour: filterField === 'natural_tour',
-      gastronomic_tour: filterField === 'gastronomic_tour'
-    }));
-    navigate("/alltours");
+    resetFilters({}, { thematicFilter: filterField });
   };
 
   return (

@@ -20,23 +20,15 @@ import img22 from '../assets/22.webp'
 import img23 from '../assets/23.webp'
 import img24 from '../assets/24.webp'
 import img25 from '../assets/25.webp'
-import { useDispatch } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
-import { setFilters } from '../features/tours/toursSlice';
-import { resetFilters as resetMainFilters } from '../features/tours/toursSlice';
-import { resetFilters as resetDetailsFilters } from '../features/tours/tourDetailsSlice';
+import { useTourFilterParams } from '../features/tours/filterParams';
 
 const ImageGrid = () => {
   const [more, setMore] = useState(false)
 
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
+  const { resetFilters } = useTourFilterParams();
 
   const handleCountrySelect = (country) => {
-    dispatch(resetMainFilters());
-    dispatch(resetDetailsFilters());
-    dispatch(setFilters({ countries: country }));
-    navigate("/alltours");
+    resetFilters({ countries: country });
   };
 
   const images = [ 

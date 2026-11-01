@@ -32,7 +32,7 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     const refreshToken = localStorage.getItem("refreshToken");
-    const isAuthRequest = ["/api/login/", "/api/register/", "/api/token/refresh/"].some(
+    const isAuthRequest = ["/api/login/", "/api/register/", "/api/logout/", "/api/token/refresh/"].some(
       (path) => originalRequest?.url?.includes(path)
     );
 

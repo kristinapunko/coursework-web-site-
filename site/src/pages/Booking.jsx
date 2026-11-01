@@ -1,24 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { cancelBooking, fetchBookings } from '../features/сabinet/bookingSlice';
-import { fetchTours } from '../features/tours/toursSlice';
-import { fetchTourDetails } from '../features/tours/tourDetailsSlice';
+import {
+    canCancelBooking,
+    getDaysRemaining,
+    getUkrainianDayLabel,
+} from '../features/сabinet/bookingCardUtils';
 import { formatDate } from '../utils/utils';
 import { Link } from 'react-router-dom';
 import { HiCalendarDateRange } from "react-icons/hi2";
-import { FiArrowRight, FiClock, FiImage } from "react-icons/fi";
+import { FiArrowRight, FiClock } from "react-icons/fi";
 import LiqPayButton from '../components/LiqPayButton';
 import Loading from '../components/ui/Loading';
+import SafeImage from '../components/ui/SafeImage';
 
 const Booking = () => {
     const dispatch = useDispatch();
     const bookings = useSelector((state) => state.booking.bookingStatus);
-    const tours = useSelector((state) => state.tours.tours);
-    const tourDetails = useSelector((state) => state.tourDetails.tourDetails);
     const userId = useSelector((state) => state.auth.user?.id);
     const loading = useSelector((state) => state.booking.loading);
     const error = useSelector((state) => state.booking.error);
-    const [daysLeftMap, setDaysLeftMap] = useState({});
 
     useEffect(() => {
         if (userId) {
@@ -26,38 +27,12 @@ const Booking = () => {
         }
     }, [dispatch, userId]);
 
-    useEffect(() => {
-        if (bookings.length > 0) {
-            dispatch(fetchTours());
-            dispatch(fetchTourDetails());
-        }
-    }, [dispatch, bookings]);
-
-    useEffect(() => {
-        if (bookings.length > 0) {
-            const newDaysLeftMap = {};
-            bookings.forEach((booking) => {
-                const tour = tours.find((t) => t.id === booking.tour) || null;
-                if (tour && tour.start_date) {
-                    const today = new Date();
-                    const tourDate = new Date(tour.start_date);
-                    const timeDiff = tourDate - today;
-                    const daysDiff = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
-                    newDaysLeftMap[booking.id] = daysDiff;
-                }
-            });
-            setDaysLeftMap(newDaysLeftMap);
-            
-        }
-    }, [bookings, tours]);
-
-    const handleCancelBooking = (bookingId) => {
-        const daysLeft = daysLeftMap[bookingId];
-        if (daysLeft === undefined) {
+    const handleCancelBooking = (bookingId, daysRemaining) => {
+        if (daysRemaining === null) {
             alert("Інформація про дату туру ще завантажується. Спробуйте ще раз.");
             return;
         }
-        if (daysLeft < 14) {
+        if (daysRemaining < 14) {
             alert("Скасування неможливе менш ніж за 14 днів до початку туру.");
             return;
         }
@@ -92,9 +67,12 @@ const Booking = () => {
 
             <div className="space-y-6">
                 {bookings.map((booking) => {
-                    const tour = tours.find((t) => t.id === booking.tour) || null;
-                    const details = tourDetails.find((d) => d.tour === booking.tour) || null;
-                    const isPastTour = tour && new Date(tour.start_date) < new Date();
+                    const tour = typeof booking.tour === 'object' ? booking.tour : null;
+                    const tourId = tour?.id ?? booking.tour;
+                    const daysRemaining = getDaysRemaining(tour?.start_date);
+                    const displayedDays = Math.max(daysRemaining ?? 0, 0);
+                    const isPastTour = daysRemaining !== null && daysRemaining < 0;
+                    const canCancel = canCancelBooking(booking.status, daysRemaining);
 
                     return (
                         <div
@@ -129,20 +107,18 @@ const Booking = () => {
                                             <span>Дата бронювання: {formatDate(booking.created_at)}</span>
                                         </div>
 
-                                        {daysLeftMap[booking.id] !== undefined && (
+                                        {daysRemaining !== null && (
                                             <div className="flex items-center">
                                                 <FiClock className="mr-2 text-[#361d32]" />
                                                 <span>
-                                                    До туру залишилось: <strong>{!isPastTour ? daysLeftMap[booking.id] : 0}</strong> {
-                                                        daysLeftMap[booking.id] === 1 ? 'день' :
-                                                            daysLeftMap[booking.id] < 5 ? 'дні' : 'днів'
-                                                    }
+                                                    До туру залишилось: <strong>{displayedDays}</strong>{' '}
+                                                    {getUkrainianDayLabel(displayedDays)}
                                                 </span>
                                             </div>
                                         )}
 
                                         <Link
-                                            to={`/tour/${booking.tour}`}
+                                            to={`/tour/${tourId}`}
                                             className="inline-flex items-center justify-end text-[#543c52] hover:text-[#e04a42] transition-colors w-full mt-2"
                                         >
                                             Детальніше про тур <FiArrowRight className="ml-1" />
@@ -156,12 +132,14 @@ const Booking = () => {
 
                                         <div className="flex gap-3">
                                             <button
-                                                className={`flex-1 py-2 rounded-xl transition-colors ${booking.status === 'canceled' || booking.status === 'confirmed'
+                                                type="button"
+                                                disabled={!canCancel}
+                                                className={`flex-1 py-2 rounded-xl transition-colors ${!canCancel
                                                         ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
                                                         : 'bg-[#edd2cb] hover:bg-[#e8c9c1] text-[#543c52]'
                                                     }`}
 
-                                                onClick={() => handleCancelBooking(booking.id)}
+                                                onClick={() => handleCancelBooking(booking.id, daysRemaining)}
                                             >
                                                 Скасувати
                                             </button>
@@ -174,22 +152,16 @@ const Booking = () => {
                                 </div>
 
                                 <div className="lg:w-1/2">
-                                    {details?.photos?.length > 0 ? (
-                                        <div className="relative h-36 md:h-64 w-full overflow-hidden rounded-xl">
-                                            <img
-                                                className="w-full h-full object-cover transition-transform hover:scale-105"
-                                                src={details.photos[0].image}
-                                                alt={`${booking.tour_name}`}
-                                                loading="lazy"
-                                                decoding="async"
-                                            />
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-                                        </div>
-                                    ) : (
-                                        <div className="h-64 w-full bg-gradient-to-br from-[#f1e8e6] to-[#edd2cb] rounded-xl flex items-center justify-center">
-                                            <FiImage className="text-4xl text-[#543c52]/50" />
-                                        </div>
-                                    )}
+                                    <div className="relative h-36 md:h-64 w-full overflow-hidden rounded-xl">
+                                        <SafeImage
+                                            className="w-full h-full object-cover transition-transform hover:scale-105"
+                                            src={tour?.image}
+                                            alt={`${booking.tour_name}`}
+                                            loading="lazy"
+                                            decoding="async"
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                                    </div>
                                 </div>
                             </div>
                         </div>

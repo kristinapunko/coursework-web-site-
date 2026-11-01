@@ -1,24 +1,32 @@
 import { useEffect, useState, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { FaGlobe, FaPlaneDeparture, FaCalendarAlt, FaUser, FaUndo } from "react-icons/fa";
+import { FaGlobe, FaPlaneDeparture, FaCalendarAlt, FaUser, FaUndo, FaSortAmountDown } from "react-icons/fa";
 import arrowIcon from "../assets/2.webp";
 import { registerLocale } from "react-datepicker";
 import uk from "date-fns/locale/uk";
 import "../App.css";
-import { fetchTours, resetFilters as resetMainFilters, setFilters } from "../features/tours/toursSlice";
-import { resetFilters as resetDetailsFilters } from "../features/tours/tourDetailsSlice";
+import { fetchTours } from "../features/tours/toursSlice";
+import { useTourFilterParams } from "../features/tours/filterParams";
 
 registerLocale("uk", uk);
+
+const SORT_OPTIONS = {
+  "Дата: найближчі": "date-asc",
+  "Дата: пізніші": "date-desc",
+  "Ціна: від нижчої": "price-asc",
+  "Ціна: від вищої": "price-desc",
+  "Тривалість: коротші": "duration-asc",
+  "Тривалість: довші": "duration-desc",
+};
 
 const Filters = () => {
   const [openDropdown, setOpenDropdown] = useState(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
 
   const dispatch = useDispatch();
-  const navigate = useNavigate();
+  const { updateFilters, updateSort, resetFilters } = useTourFilterParams();
   const { filters, tours, countries, cities } = useSelector((state) => state.tours);
 
   const startDate = filters.startDate ? new Date(filters.startDate) : null;
@@ -29,15 +37,16 @@ const Filters = () => {
   const debounceTimeout = useRef(null);
 
   useEffect(() => {
+    setSearchInput(filters.searchQuery || "");
+  }, [filters.searchQuery]);
+
+  useEffect(() => () => clearTimeout(debounceTimeout.current), []);
+
+  useEffect(() => {
     if (tours.length === 0) {
       dispatch(fetchTours());
     }
   }, [dispatch, tours.length]);
-
-  const updateFilters = (newFilters) => {
-    dispatch(setFilters({ ...filters, ...newFilters }));
-    navigate("/alltours");
-  };
 
   const handleSearchChange = (e) => {
     const value = e.target.value;
@@ -48,7 +57,7 @@ const Filters = () => {
     }
   
     debounceTimeout.current = setTimeout(() => {
-      updateFilters({ searchQuery: value });
+      updateFilters({ searchQuery: value }, { replace: true });
     }, 700); 
   };
   
@@ -60,9 +69,16 @@ const Filters = () => {
 
   const handleDateChange = (dates) => {
     const [start, end] = dates;
+    const toDateParam = (date) => {
+      if (!date) return null;
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
     updateFilters({
-      startDate: start ? start.toISOString() : null,
-      endDate: end ? end.toISOString() : null,
+      startDate: toDateParam(start),
+      endDate: toDateParam(end),
     });
   };
 
@@ -74,12 +90,13 @@ const Filters = () => {
   };
 
   const handleSearch = () => {
-    navigate("/alltours");
+    clearTimeout(debounceTimeout.current);
+    updateFilters({ searchQuery: searchInput });
   };
 
   const handleResetAllFilters = () => {
-    dispatch(resetMainFilters());
-    dispatch(resetDetailsFilters());
+    resetFilters();
+    setSearchInput("");
     setOpenDropdown(null);
     setCalendarOpen(false);
   };
@@ -95,8 +112,8 @@ const Filters = () => {
         : "")
     : "Оберіть дату";
 
-  const Dropdown = ({ id, icon, label, value, options, onChange }) => (
-    <div className="relative w-full">
+  const Dropdown = ({ id, icon, label, value, options, onChange, containerClass = "w-full" }) => (
+    <div className={`relative ${containerClass}`}>
       <div
         className="flex items-center gap-3 p-2 lg:p-4 bg-white shadow-md rounded-lg cursor-pointer"
         onClick={() => toggleDropdown(id)}
@@ -125,8 +142,8 @@ const Filters = () => {
 
   return (
     <div className="w-[90vw] xl:w-[80vw] mx-auto mt-6 bg-[#361d32]/25 p-4 lg:p-6 rounded-xl shadow-lg">
-      <div className="w-full lg:w-[50vw] mx-auto relative lg:flex items-center mb-3 lg:mb-6 gap-6">
-        <div className="w-full lg:w-[50vw] relative flex items-center">
+      <div className="w-full xl:w-[75vw] mx-auto relative lg:flex items-center mb-3 lg:mb-6 gap-4">
+        <div className="w-full lg:flex-1 relative flex items-center">
           <input
             type="text"
             name="searchQuery"
@@ -148,6 +165,15 @@ const Filters = () => {
         >
           <FaUndo /> Скинути фільтри
         </button>
+        <Dropdown
+          id="sort"
+          icon={<FaSortAmountDown />}
+          label="Сортування"
+          value={Object.keys(SORT_OPTIONS).find((label) => SORT_OPTIONS[label] === filters.sort)}
+          options={Object.keys(SORT_OPTIONS)}
+          onChange={(label) => updateSort(SORT_OPTIONS[label])}
+          containerClass="w-full lg:w-64"
+        />
       </div>
 
       <div className="flex flex-col lg:flex-row items-center gap-1 lg:gap-4">

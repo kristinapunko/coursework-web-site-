@@ -1,229 +1,243 @@
-from rest_framework import generics, permissions, status, viewsets, serializers
-from rest_framework.response import Response
-from .models import  LikedTour, Booking, BookingPayment
-from .serializers import  LikedTourSerializer, BookingSerializer
-from tours.models import TourDescription
-from rest_framework_simplejwt.authentication import JWTAuthentication
-from django.shortcuts import get_object_or_404
-import logging, hashlib, json, base64
+import base64
+import hashlib
+import hmac
+import json
+import logging
+from decimal import Decimal, InvalidOperation
+from urllib.parse import urlparse
+
 from django.conf import settings
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.db.models import Q
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError, transaction
+from django.shortcuts import get_object_or_404
+from rest_framework import generics, permissions, serializers, status, viewsets
+from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from django.utils.decorators import method_decorator
+
+from tours.models import TourDescription
+
+from .models import Booking, BookingPayment, LikedTour
+from .serializers import BookingSerializer, LikedTourSerializer
 
 logger = logging.getLogger(__name__)
 
 
-# class CartCreateView(generics.CreateAPIView):
-#     serializer_class = CartSerializer
-#     permission_classes = [permissions.IsAuthenticated]
+def liqpay_signature(data):
+    private_key = settings.LIQPAY_PRIVATE_KEY.strip()
+    payload = f"{private_key}{data}{private_key}"
+    return base64.b64encode(hashlib.sha1(payload.encode("utf-8")).digest()).decode("ascii")
 
-#     def perform_create(self, serializer):
-#         serializer.save(user=self.request.user)
 
-# class CartItemCreateView(generics.CreateAPIView):
-#     serializer_class = CartItemSerializer
-#     permission_classes = [permissions.IsAuthenticated]
+def is_public_liqpay_url(value):
+    """Only send URLs that LiqPay can reach and validate."""
+    if not value:
+        return False
 
-#     def perform_create(self, serializer):
-#         cart, created = Cart.objects.get_or_create(user=self.request.user)
-#         serializer.save(cart=cart)
-# class CartItemDeleteView(generics.DestroyAPIView):
-#     serializer_class = CartItemSerializer
-#     permission_classes = [permissions.IsAuthenticated]
+    parsed = urlparse(value.strip())
+    hostname = (parsed.hostname or "").lower()
+    return (
+        parsed.scheme == "https"
+        and bool(hostname)
+        and hostname not in {"localhost", "127.0.0.1", "0.0.0.0"}
+        and not hostname.endswith(".localhost")
+        and hostname != "example.com"
+        and not hostname.endswith(".example.com")
+    )
 
-#     def get_queryset(self):
-#         return CartItem.objects.filter(cart__user=self.request.user)
 
 class ToggleLikeView(generics.GenericAPIView):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
-    
-    def post(self, request, *args, **kwargs):
-        logger.info(f"ToggleLike request from user: {request.user.email}")
-        logger.info(f"Request data: {request.data}")
-        
-        try:
-            tour_id = request.data.get('tour')
-            if not tour_id:
-                logger.error("No tour ID provided")
-                return Response(
-                    {'error': 'Tour ID is required'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+    permission_classes = [permissions.IsAuthenticated]
 
-            tour = get_object_or_404(TourDescription, id=tour_id)
-            logger.info(f"Found tour: {tour.id} - {tour.name}")
-            
-            liked_tour = LikedTour.objects.filter(
-                user=request.user,
-                tour=tour
-            ).first()
-            
-            if liked_tour:
-                liked_tour.delete()
-                logger.info("Like removed")
-                return Response({'status': 'unliked'})
-            else:
-                LikedTour.objects.create(user=request.user, tour=tour)
-                logger.info("Like added")
-                return Response({'status': 'liked'})
-                
-        except Exception as e:
-            logger.error(f"Error in ToggleLikeView: {str(e)}", exc_info=True)
-            return Response(
-                {'error': 'Internal server error'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+    def post(self, request, *args, **kwargs):
+        tour_id = request.data.get("tour")
+        if not tour_id:
+            return Response({"tour": ["This field is required."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        tour = get_object_or_404(TourDescription, id=tour_id)
+        liked_tour = LikedTour.objects.filter(user=request.user, tour=tour).first()
+        if liked_tour:
+            liked_tour.delete()
+            return Response({"status": "unliked"})
+
+        try:
+            LikedTour.objects.create(user=request.user, tour=tour)
+        except IntegrityError:
+            return Response({"status": "liked"})
+        return Response({"status": "liked"}, status=status.HTTP_201_CREATED)
+
 
 class LikedToursListView(generics.ListAPIView):
     serializer_class = LikedTourSerializer
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return LikedTour.objects.filter(user=self.request.user)
+        return LikedTour.objects.filter(user=self.request.user).select_related("tour")
 
     def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        tour_ids = queryset.values_list('tour__id', flat=True)
+        tour_ids = self.get_queryset().values_list("tour_id", flat=True)
         return Response(list(tour_ids))
+
 
 class BookingViewSet(viewsets.ModelViewSet):
     serializer_class = BookingSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ["get", "post", "delete", "head", "options"]
 
     def get_queryset(self):
-        logger.info(f"Request user: {self.request.user}")
-        bookings = Booking.objects.filter(user=self.request.user)
-        logger.info(f"Bookings found: {bookings.count()}")
-        return bookings
+        return (
+            Booking.objects.filter(user=self.request.user)
+            .select_related("tour")
+            .prefetch_related("tour__details__photos")
+            .order_by("-created_at")
+        )
 
     def perform_create(self, serializer):
-        logger.info(f"Request user: {self.request.user}")
-        logger.info(f"Headers: {self.request.headers}")
-        logger.info(f"Request data: {self.request.data}") 
-        tour_id = self.request.data.get('tour')
-        if Booking.objects.filter(user=self.request.user, tour_id=tour_id).exists():
-            raise serializers.ValidationError({"detail": "Ви вже забронювали цей тур"})
-        serializer.save(user=self.request.user)
+        try:
+            serializer.save(user=self.request.user)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"detail": exc.messages}) from exc
+        except IntegrityError as exc:
+            raise serializers.ValidationError(
+                {"detail": "You already have an active booking for this tour."}
+            ) from exc
 
     def destroy(self, request, *args, **kwargs):
         booking = self.get_object()
-        if booking.can_cancel():
-            booking.cancel_booking()
-            return Response({"message": "Бронювання скасовано"}, status=status.HTTP_200_OK)
-        return Response({"error": "Скасувати бронювання вже не можна"}, status=status.HTTP_400_BAD_REQUEST)
+        if booking.cancel_booking():
+            return Response({"message": "Booking canceled."}, status=status.HTTP_200_OK)
+        return Response(
+            {"error": "Booking can no longer be canceled."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
 
 class LiqPayButtonView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, booking_id):
-        try:
-            booking = Booking.objects.get(pk=booking_id, user=request.user)
-            payment, created = BookingPayment.objects.get_or_create(
-                booking=booking,
-                defaults={'amount': booking.tour.price}
+        if not all([settings.LIQPAY_PUBLIC_KEY, settings.LIQPAY_PRIVATE_KEY]):
+            return Response(
+                {"error": "Payment provider is not configured."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-            params = {
+        booking = get_object_or_404(
+            Booking.objects.select_related("tour"), pk=booking_id, user=request.user
+        )
+        if booking.status == "canceled":
+            return Response({"error": "Canceled bookings cannot be paid."}, status=409)
+
+        payment, _ = BookingPayment.objects.get_or_create(
+            booking=booking, defaults={"amount": booking.total_price}
+        )
+        params = {
             "action": "pay",
-            "amount": f"{float(payment.amount):.2f}", 
+            "amount": f"{payment.amount:.2f}",
             "currency": "UAH",
-            "description": f"Оплата за бронювання туру №{booking.id}",
+            "description": f"Payment for booking #{booking.id}",
             "order_id": f"booking-{booking.id}",
             "version": "3",
-            "sandbox": 1,
-            "server_url": "https://8feb-213-109-233-8.ngrok-free.app/cabinet/api/liqpay-callback/",
-            "result_url": "http://localhost:5173/",
-            "public_key": settings.LIQPAY_PUBLIC_KEY
+            "sandbox": "1" if settings.LIQPAY_SANDBOX else "0",
+            "public_key": settings.LIQPAY_PUBLIC_KEY.strip(),
         }
-
-            data = base64.b64encode(json.dumps(params).encode('utf-8')).decode('utf-8')
-            private_key = settings.LIQPAY_PRIVATE_KEY
-            sign_string = private_key + data + private_key
-            signature = base64.b64encode(hashlib.sha1(sign_string.encode('utf-8')).digest()).decode('utf-8')
-
-            return Response({
-                "data": data,
-                "signature": signature,
-                "public_key": settings.LIQPAY_PUBLIC_KEY
-            })
-
-        except Booking.DoesNotExist:
-            return Response({"error": "Booking not found or access denied"}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            logger.error(f"LiqPayButtonView error: {str(e)}")
-            return Response({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        if is_public_liqpay_url(settings.LIQPAY_SERVER_URL):
+            params["server_url"] = settings.LIQPAY_SERVER_URL.strip()
+        if is_public_liqpay_url(settings.LIQPAY_RESULT_URL):
+            params["result_url"] = settings.LIQPAY_RESULT_URL.strip()
+        payload_json = json.dumps(params, separators=(",", ":"), ensure_ascii=False)
+        if settings.DEBUG:
+            # Temporary sandbox diagnostic. The private key is never included here.
+            print(f"LiqPay payment payload: {payload_json}")
+        data = base64.b64encode(
+            payload_json.encode("utf-8")
+        ).decode("ascii")
+        return Response({"data": data, "signature": liqpay_signature(data)})
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class LiqPayCallbackView(APIView):
-    permission_classes = [AllowAny] 
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
 
     def post(self, request):
-        data = request.POST.get('data')
-        signature = request.POST.get('signature')
-
-        logger.info(f"LiqPay Callback data={data}, signature={signature}")
-
-        if not data:
-            return Response({"error": "Missing data"}, status=status.HTTP_400_BAD_REQUEST)
+        data = request.data.get("data")
+        signature = request.data.get("signature")
+        if not data or not signature:
+            return Response(
+                {"error": "Missing data or signature."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        if not settings.LIQPAY_PRIVATE_KEY:
+            return Response(
+                {"error": "Payment provider is not configured."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        if not hmac.compare_digest(signature, liqpay_signature(data)):
+            return Response({"error": "Invalid signature."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            decoded_json = base64.b64decode(data).decode('utf-8')
-            decoded_data = json.loads(decoded_json)
+            decoded_data = json.loads(base64.b64decode(data, validate=True).decode("utf-8"))
+            order_id = decoded_data["order_id"]
+            callback_amount = Decimal(str(decoded_data["amount"]))
+        except (KeyError, ValueError, TypeError, InvalidOperation, json.JSONDecodeError):
+            return Response({"error": "Invalid callback payload."}, status=status.HTTP_400_BAD_REQUEST)
 
-            order_id = decoded_data.get("order_id")
-            payment_id = decoded_data.get("payment_id")
-            status_payment = decoded_data.get("status", "").lower()
-            amount = decoded_data.get("amount")
+        if not order_id.startswith("booking-"):
+            return Response({"error": "Invalid order ID."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            booking_id = int(order_id.removeprefix("booking-"))
+        except ValueError:
+            return Response({"error": "Invalid order ID."}, status=status.HTTP_400_BAD_REQUEST)
 
-            if order_id and order_id.startswith("booking-"):
-                booking_id = int(order_id.split('-')[1])
-                payment = BookingPayment.objects.filter(booking_id=booking_id).first()
-            else:
-                payment = BookingPayment.objects.filter(
-                    Q(liqpay_order_id=order_id) | Q(liqpay_payment_id=payment_id)
-                ).first()
-
+        with transaction.atomic():
+            payment = (
+                BookingPayment.objects.select_for_update()
+                .select_related("booking")
+                .filter(booking_id=booking_id)
+                .first()
+            )
             if not payment:
-                return Response({"error": "Payment not found"}, status=status.HTTP_404_NOT_FOUND)
+                return Response({"error": "Payment not found."}, status=status.HTTP_404_NOT_FOUND)
+            if callback_amount != payment.amount:
+                return Response({"error": "Payment amount mismatch."}, status=status.HTTP_400_BAD_REQUEST)
 
-            payment.liqpay_status = status_payment
-            payment.liqpay_payment_id = payment_id
+            payment_status = str(decoded_data.get("status", "")).lower()
+            successful_statuses = {"success"}
+            if settings.LIQPAY_SANDBOX:
+                successful_statuses.add("sandbox")
+
+            payment.liqpay_status = payment_status
+            payment.liqpay_payment_id = decoded_data.get("payment_id")
             payment.liqpay_order_id = order_id
-
-            if status_payment in ("success", "sandbox"):
+            if payment_status in successful_statuses:
                 payment.is_paid = True
-                if payment.booking:
-                    payment.booking.status = "confirmed"
-                    payment.booking.save()
-
-            payment.save()
-
-        except Exception as e:
-            logger.error(f"LiqPay callback processing error: {str(e)}")
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                Booking.objects.filter(pk=payment.booking_id, status="pending").update(
+                    status="confirmed"
+                )
+            payment.save(
+                update_fields=[
+                    "liqpay_status",
+                    "liqpay_payment_id",
+                    "liqpay_order_id",
+                    "is_paid",
+                ]
+            )
 
         return Response({"status": "ok"})
 
 
 class PaymentStatusView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, payment_id):
-        try:
-            payment = BookingPayment.objects.get(pk=payment_id, booking__user=request.user)
-            return Response({
-                'is_paid': payment.is_paid,
-                'status': payment.liqpay_status,
-                'amount': str(payment.amount),
-                'booking_id': payment.booking.id if payment.booking else None
-            })
-        except BookingPayment.DoesNotExist:
-            return Response({'error': 'Payment not found'}, status=status.HTTP_404_NOT_FOUND)
+        payment = get_object_or_404(
+            BookingPayment.objects.select_related("booking"),
+            pk=payment_id,
+            booking__user=request.user,
+        )
+        return Response(
+            {
+                "is_paid": payment.is_paid,
+                "status": payment.liqpay_status,
+                "amount": str(payment.amount),
+                "booking_id": payment.booking_id,
+            }
+        )

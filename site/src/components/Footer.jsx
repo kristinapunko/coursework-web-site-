@@ -1,8 +1,6 @@
 import { FaFacebookF, FaInstagram, FaYoutube, FaTelegram, FaTiktok } from "react-icons/fa";
-import { Link, useNavigate } from "react-router-dom";
-import { useDispatch } from "react-redux";
-import { resetFilters as resetMainFilters, setFilters } from "../features/tours/toursSlice";
-import { resetFilters as resetDetailsFilters, setFilters as setFiltersDetails } from "../features/tours/tourDetailsSlice";
+import { Link } from "react-router-dom";
+import { buildTourFilterUrl } from "../features/tours/filterParams";
 
 const footerSections = [
   {
@@ -47,21 +45,9 @@ const socialIcons = [
 ];
 
 const Footer = () => {
-  const navigate = useNavigate();
-  const dispatch = useDispatch();
-
-  const handleLinkClick = (filters, to) => {
-    dispatch(resetMainFilters());
-    dispatch(resetDetailsFilters());
-    if (filters?.main) dispatch(setFilters(filters.main));
-    if (filters?.details) dispatch(setFiltersDetails(filters.details));
-    navigate(to);
-  };
-
   const FooterLink = ({ text, to, filters }) => (
     <Link
-      to={to}
-      onClick={() => handleLinkClick(filters, to)}
+      to={filters ? buildTourFilterUrl(filters) : to}
       className="block text-[#edd2cb] hover:text-[#f55951] duration-300 text-sm cursor-pointer leading-6"
     >
       {text}

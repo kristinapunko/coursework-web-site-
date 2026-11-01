@@ -1,5 +1,12 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, createSelector } from '@reduxjs/toolkit';
 import api from '../../api/client';
+import { DEFAULT_TOUR_FILTERS } from './filterParams';
+
+const createDefaultFilters = () => ({
+  ...DEFAULT_TOUR_FILTERS,
+  selectedFood: [],
+  tourIds: [],
+});
 
 const initialState = {
   loading: false,
@@ -10,26 +17,7 @@ const initialState = {
   countries: [],
   minPrice: 0,
   maxPrice: 0,
-  filters: { 
-    searchQuery: "",
-    countries: "", 
-    startDate: null, 
-    endDate: null, 
-    adults: null, 
-    children: null, 
-    hasChildren: false,
-    hotTours: false, 
-    promotion: false, 
-    cities: "", 
-    minPrice: 0,
-    maxPrice:null,
-    transport: null, 
-    selectedFood: [],
-    popularTours: false,
-    premiumTours: false,
-  }, 
-  filteredTours: [], 
-  popularTours: [],
+  filters: createDefaultFilters(),
 };
 
 export const fetchTours = createAsyncThunk(
@@ -55,27 +43,8 @@ const toursSlice = createSlice({
   name: 'tour',
   initialState,
   reducers: {
-    setFilters: (state, action) => {
-      state.filters = { ...state.filters, ...action.payload };
-      state.filteredTours = filterTours(state);
-    },
-    setSelectedCity: (state, action) => {
-      state.filters.cities = action.payload;
-      state.filteredTours = filterTours(state);
-    },
-    setSelectedCountry: (state, action) => {
-      state.filters.countries = action.payload;
-      state.filteredTours = filterTours(state);
-    },
-    resetFilters: (state) => {
-      state.filters = initialState.filters;
-      state.filteredTours = state.tours;
-      state.popularTours = [];
-    },
-    setPopularTours: (state, action) => {
-      state.popularTours = action.payload;
-      state.filters.popularTours = true;
-      state.filteredTours = filterTours(state);
+    replaceFilters: (state, action) => {
+      state.filters = { ...createDefaultFilters(), ...action.payload };
     },
   },
   extraReducers: (builder) => {
@@ -125,8 +94,6 @@ const toursSlice = createSlice({
 
         state.minPrice = Number.isFinite(minPrice) ? minPrice : 0;
         state.maxPrice = Number.isFinite(maxPrice) ? maxPrice : 0;
-
-        state.filteredTours = filterTours(state); 
       })
       .addCase(fetchTours.rejected, (state, action) => {
         state.loading = false;
@@ -146,9 +113,7 @@ const toursSlice = createSlice({
   },
 });
 
-const filterTours = (state) => {
-  const { tours, filters, popularTours } = state;
-  
+const filterTours = (tours, filters) => {
   return tours.filter((tour) => {
     const { 
       searchQuery, 
@@ -165,8 +130,8 @@ const filterTours = (state) => {
       maxPrice = Infinity,
       transport,
       selectedFood, 
-      popularTours: isPopularTours,
       premiumTours,
+      tourIds,
     } = filters;
 
     const countriesArray = tour.countries ? tour.countries.split(',').map(c => c.trim()) : [];
@@ -200,7 +165,7 @@ const filterTours = (state) => {
     const isPriceMatch = price >= parsedMinPrice && price <= parsedMaxPrice;
 
     const isFoodMatch = !selectedFood || !selectedFood.length || selectedFood.includes(tour.food);
-    const isPopularTourMatch = !isPopularTours || popularTours.some((popular) => popular.id === tour.id);
+    const isSelectedTourMatch = !tourIds?.length || tourIds.includes(tour.id);
     
     const isPremiumTourMatch = !premiumTours || price >= 100000; 
 
@@ -217,18 +182,22 @@ const filterTours = (state) => {
       isPromotionMatch &&
       isTransportMatch &&
       isFoodMatch &&
-      isPopularTourMatch &&
+      isSelectedTourMatch &&
       isPremiumTourMatch
     );
   });
 };
 
+const selectTours = (state) => state.tours.tours;
+const selectTourFilters = (state) => state.tours.filters;
+
+export const selectFilteredTours = createSelector(
+  [selectTours, selectTourFilters],
+  filterTours
+);
+
 export const { 
-  setFilters, 
-  resetFilters, 
-  setSelectedCity, 
-  setSelectedCountry, 
-  setPopularTours 
+  replaceFilters,
 } = toursSlice.actions;
 
 export default toursSlice.reducer;

@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 class UserRegistrationAPIView(GenericAPIView):
     permission_classes = (AllowAny,)
     serializer_class =UserRegisterSerializer
+    throttle_scope = "auth"
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -23,6 +24,7 @@ class UserRegistrationAPIView(GenericAPIView):
 class UserLoginAPIView(GenericAPIView):
     permission_classes = (AllowAny,)
     serializer_class = UserLoginSerializer
+    throttle_scope = "auth"
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -50,7 +52,7 @@ class UserLogoutAPIView(GenericAPIView):
             token = RefreshToken(refresh_token)
             token.blacklist()
             return Response(status=status.HTTP_205_RESET_CONTENT)
-        except Exception as e:
+        except (KeyError, ValueError):
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
 class UserInfoAPIView(RetrieveAPIView):

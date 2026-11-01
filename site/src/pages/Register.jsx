@@ -57,17 +57,11 @@ const Register = () => {
         navigate('/');
       })
       .catch((err) => {
-        const message = typeof err === 'string' ? err : err?.message || "Невідома помилка";
-  
-        if (message.includes("username")) {
-          setError("Користувач із таким ім’ям вже існує");
-        } else if (message.includes("email")) {
-          setError("Цей email вже використовується");
-        } else if (message.includes("password")) {
-          setError("Пароль не відповідає вимогам");
-        } else {
-          setError("Сталася помилка під час реєстрації");
-        }
+        setError(
+          typeof err === 'string'
+            ? err
+            : err?.message || "Сталася помилка під час реєстрації"
+        );
       })
       .finally(() => {
         setIsLogging(false);
@@ -81,11 +75,24 @@ const Register = () => {
       const toggleConfirmPasswordVisibility = () => {
         setConfirmPasswordShown(!confirmPasswordShown);
       };
+
+    const errorMessages = typeof error === 'string'
+      ? error.split(/\r?\n/).map((message) => message.trim()).filter(Boolean)
+      : [];
+
     return (
         <div>
         <div className="bg-[#543c52]/50 border-[#edd2cb] rounded-2xl py-4 px-8 md:py-8 md:px-16 shadow-lg backdrop-blur-sm relative">
             <h1 className="text-3xl md:text-4xl text-white font-bold text-center mb-4 md:mb-8">Register</h1>
-            {error && <p className="text-red-500 text-center text-lg">{error}</p>}
+            {errorMessages.length > 0 && (
+                <div role="alert" className="mb-4 w-full rounded-xl border border-red-200 bg-red-50/95 px-4 py-3 text-left text-sm text-red-800 shadow-sm md:w-80">
+                    <div className="flex flex-col gap-1 whitespace-normal break-words">
+                        {errorMessages.map((message, index) => (
+                            <p key={`${message}-${index}`} className="whitespace-normal break-words">{message}</p>
+                        ))}
+                    </div>
+                </div>
+            )}
             {successMessage && <p className="text-green-500 text-center">{successMessage}</p>}
             <form onSubmit={handleSubmit}>
             <div className="relative  my-3 md:my-6">

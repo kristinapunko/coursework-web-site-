@@ -4,7 +4,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import TourCard from '../components/ui/TourCard';
 import Loading from '../components/ui/Loading';
 import { fetchLikedTours, toggleLike } from '../features/сabinet/likedToursSlice';
-import { fetchReviews } from '../features/tours/reviewsSlice';
 import { fetchTourDetails } from '../features/tours/tourDetailsSlice';
 import { fetchTours } from '../features/tours/toursSlice';
 
@@ -19,17 +18,11 @@ const Cabinet = () => {
     loading: detailsLoading,
     error: detailsError,
   } = useSelector((state) => state.tourDetails);
-  const reviews = useSelector((state) => state.reviews.reviews);
-
   useEffect(() => {
     dispatch(fetchLikedTours());
     dispatch(fetchTours());
     dispatch(fetchTourDetails());
   }, [dispatch]);
-
-  useEffect(() => {
-    if (likedTourIds.length) dispatch(fetchReviews(likedTourIds));
-  }, [dispatch, likedTourIds]);
 
   const toursById = useMemo(
     () => new Map(tours.map((tour) => [tour.id, tour])),
@@ -75,7 +68,6 @@ const Cabinet = () => {
               key={tourId}
               tour={tour}
               details={details}
-              reviews={reviews}
               onLikeClick={() => handleToggleLike(tourId)}
               isLiked
             />

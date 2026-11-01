@@ -9,15 +9,15 @@ const initialState = {
 
 export const sendBookingRequest = createAsyncThunk(
     'booking/sendBookingRequest',
-    async ({ tourId, userId }, { rejectWithValue }) => {
+    async ({ tourId, bookingData }, { rejectWithValue }) => {
         try {
             const token = localStorage.getItem('accessToken');
             if (!token) throw new Error('No token found');
             if (!tourId) throw new Error('Tour ID is missing');
 
             const response = await api.post('/cabinet/bookings/', {
-                user: userId,
                 tour: tourId,
+                ...bookingData,
             });
             return response.data;
         } catch (error) {

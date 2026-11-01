@@ -5,7 +5,6 @@ import { checkLoggedInUser } from '../features/authentication/authSlice';
 import TourCard from './ui/TourCard';
 import { fetchLikedTours, toggleLike, selectLikedTourIds } from '../features/сabinet/likedToursSlice';
 import { useLocation } from 'react-router-dom';
-import { fetchReviews } from '../features/tours/reviewsSlice';
 import Loading from './ui/Loading';
 
 const TourList = ({ tours }) => {
@@ -16,23 +15,17 @@ const TourList = ({ tours }) => {
   const { 
     tourDetails, 
     loading: detailsLoading, 
-    filteredTours 
   } = useSelector((state) => state.tourDetails);
-
   const { isLoggedIn } = useSelector((state) => state.auth);
   const likedTourIds = useSelector(selectLikedTourIds);
 
   useEffect(() => {
     dispatch(fetchTourDetails());
-    const tourIds = tours.map(tour => tour.id);
-    dispatch(fetchReviews(tourIds));
     if (isLoggedIn) {
       dispatch(fetchLikedTours());
     }
   }, [dispatch, isLoggedIn, tours]);
   
-  const reviews = useSelector((state) => state.reviews.reviews);
-
   const handleToggleLike = (tourId) => {
     if (!isLoggedIn) {
       alert('Будь ласка, увійдіть до системи, щоб додавати тури до улюблених');
@@ -60,31 +53,7 @@ const TourList = ({ tours }) => {
     });
   }, [tours, tourDetails]);
 
-  const getToursToDisplay = () => {
-    const isHomePage = location.pathname === '/';
-    
-    if (isHomePage) {
-      return toursWithDetails;
-    }
-    
-    if (filteredTours === null || filteredTours === undefined) {
-      return toursWithDetails;
-    }
-    
-    if (filteredTours.length === 0) {
-      return [];
-    }
-    
-    return toursWithDetails.filter(tour => 
-      filteredTours.some(ft => ft.tour === tour.id)
-    );
-  };
-
-  const toursToDisplay = useMemo(getToursToDisplay, [
-    location.pathname, 
-    filteredTours, 
-    toursWithDetails
-  ]);
+  const toursToDisplay = toursWithDetails;
 
   const isHomePage = location.pathname === '/';
   
@@ -129,7 +98,6 @@ const TourList = ({ tours }) => {
               key={tour.id}
               tour={tour}
               details={tour.details}
-              reviews={reviews}
               onLikeClick={(e) => handleToggleLike(tour.id, e)}
               isLiked={isLiked}
             />

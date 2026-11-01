@@ -1,20 +1,12 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, createSelector } from '@reduxjs/toolkit';
 import api from '../../api/client';
+import { DEFAULT_DETAIL_FILTERS } from './filterParams';
 
 const initialState = {
   loading: false,
   tourDetails: [],
   selectedTourDetails: null,
-  filters: {
-    thematicFilter: "",
-    beach_tour: false,
-    festivals: false,
-    winter_tour: false,
-    extreme_tour: false,
-    natural_tour: false,
-    gastronomic_tour: false
-  },
-  filteredTours: [],
+  filters: { ...DEFAULT_DETAIL_FILTERS },
   countries: [],
   error: "",
 };
@@ -47,14 +39,12 @@ const tourDetailsSlice = createSlice({
   reducers: {
     setFilters: (state, action) => {
       state.filters = {
-        ...initialState.filters, 
+        ...DEFAULT_DETAIL_FILTERS,
         ...action.payload 
       };
-      state.filteredTours = filterTours(state.tourDetails, state.filters);      
     },
     resetFilters: (state) => {
-      state.filters = initialState.filters;
-      state.filteredTours = state.tourDetails;
+      state.filters = { ...DEFAULT_DETAIL_FILTERS };
     }
   },
   extraReducers: (builder) => {
@@ -65,7 +55,6 @@ const tourDetailsSlice = createSlice({
       .addCase(fetchTourDetails.fulfilled, (state, action) => {
         state.loading = false;
         state.tourDetails = action.payload;
-        state.filteredTours = filterTours(action.payload, state.filters);
       })
       .addCase(fetchTourDetails.rejected, (state, action) => {
         state.loading = false;
@@ -86,12 +75,18 @@ const tourDetailsSlice = createSlice({
 });
 
 const filterTours = (tourDetails, filters) => {
-  if (!filters.thematicFilter) return tourDetails;
-  
   return tourDetails.filter(tour => {
-    return tour[filters.thematicFilter] === true;
+    return !filters.thematicFilter || tour[filters.thematicFilter] === true;
   });
 };
+
+const selectTourDetails = (state) => state.tourDetails.tourDetails;
+const selectTourDetailFilters = (state) => state.tourDetails.filters;
+
+export const selectFilteredTourDetails = createSelector(
+  [selectTourDetails, selectTourDetailFilters],
+  filterTours
+);
 
 export const { setFilters, resetFilters, } = tourDetailsSlice.actions;
 export default tourDetailsSlice.reducer;

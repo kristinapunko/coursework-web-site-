@@ -1,11 +1,13 @@
 from .models import CustomUser
 from rest_framework import serializers
 from django.contrib.auth import authenticate
+from django.contrib.auth.password_validation import validate_password
 
 class CustomUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields = ("id", "username", "email")
+        fields = ("id", "username", "email", "is_staff")
+        read_only_fields = ("id", "is_staff")
 
 class UserRegisterSerializer(serializers.ModelSerializer):
     password1 = serializers.CharField(write_only=True)
@@ -13,16 +15,16 @@ class UserRegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-        fields = ("id", "username", "email", "password1", "password2")
-        extra_kwargs = {"password":{"write_only":True}}
+        fields = ("id", "username", "email", "is_staff", "password1", "password2")
+        read_only_fields = ("id", "is_staff")
 
     def validate(self, attrs):
         if attrs['password1'] != attrs['password2']:
             raise serializers.ValidationError("Паролі не співпадають")
 
         password = attrs.get("password1", "")
-        if len(password) < 8:
-            raise serializers.ValidationError("Пароль має менше 8 символів")
+        candidate_user = CustomUser(username=attrs.get("username"), email=attrs.get("email"))
+        validate_password(password, user=candidate_user)
         
         return attrs
     
