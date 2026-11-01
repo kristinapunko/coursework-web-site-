@@ -1,0 +1,198 @@
+@media (min-width: 1025px) {
+ion-icon {
+  display: block !important;
+  visibility: hidden !important;
+}
+}
+/* Стилізація кнопок */
+.swiper-button-next:after, .swiper-button-prev:after {
+  
+  color: white;
+  
+  padding: 10px;
+ 
+  font-size: 24px !important
+}
+.swiper:hover .swiper-button-next,
+.swiper:hover .swiper-button-prev {
+  opacity: 1;
+  visibility: visible;
+}
+
+.swiper-button-next,
+.swiper-button-prev {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+}
+
+.swiper-pagination-bullet {
+
+  background-color: #edd2cb !important;
+  opacity: 1 !important;
+}
+
+.swiper-pagination-bullet-active {
+  background-color: white !important;
+}
+
+/* Приховує стандартне око в Chrome/Safari */
+input::-webkit-credentials-auto-fill-button {
+  display: none !important;
+}
+
+/* Приховує око та кнопку очищення в Edge */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
+/* Запобігає автозаповненню пароля (іконка 🔒) */
+input {
+  background-color: transparent !important;
+  -webkit-text-fill-color: white !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* .custom-datepicker {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 10px; /* Відстань між місяцями */
+
+@media (min-width: 768px){
+  .custom-datepicker {
+    display: flex !important;
+    flex-direction: row !important;
+    
+  }
+}
+
+.react-datepicker__header{
+  background-color: rgba(54, 29, 50, 0.5) !important;
+  color: #f1e8e6 !important;
+}
+.react-datepicker {
+  background: white !important;
+}
+.react-datepicker__day--selected, .react-datepicker__day--in-selecting-range, .react-datepicker__day--in-range, .react-datepicker__month-text--selected, .react-datepicker__month-text--in-selecting-range, .react-datepicker__month-text--in-range, .react-datepicker__quarter-text--selected, .react-datepicker__quarter-text--in-selecting-range, .react-datepicker__quarter-text--in-range, .react-datepicker__year-text--selected, .react-datepicker__year-text--in-selecting-range, .react-datepicker__year-text--in-range {
+  background-color: #361d32 !important;
+  opacity: 50%;
+  color: #f1e8e6 !important;
+}
+.react-datepicker__day-name, .react-datepicker__day, .react-datepicker__time-name {
+  color: #543c52;
+}
+/* .react-datepicker__day--keyboard-selected, .react-datepicker__month-text--keyboard-selected, .react-datepicker__quarter-text--keyboard-selected, .react-datepicker__year-text--keyboard-selected {
+  background-color: rgb(186.25, 217.0833333333, 241.25);
+  color: #f55951;
+} */
+input {
+  font-weight: bold !important;
+  -webkit-text-fill-color: #543c52 !important;
+}
+
+.react-datepicker__day--keyboard-selected, .react-datepicker__month-text--keyboard-selected, .react-datepicker__quarter-text--keyboard-selected, .react-datepicker__year-text--keyboard-selected {
+  background-color: #edd2cb !important;
+  color: #f55951 !important;
+}
+
+/* Стилі для підказок */
+.tooltip {
+  position: relative;
+}
+
+.tooltip::after {
+  display: block;
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 0%;
+  bottom:10%;
+  transform: translateX(-100%);
+  padding: 4px 8px;
+  background-color: #f55951;
+  color: white;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+}
+
+.tooltip:hover::after {
+  opacity: 1;
+  visibility: visible;
+
+}
+
+
+a.active{
+  color:#361d32;
+  font-weight: 600;
+}
+
+
+
+/* Рендж у фільтрах */
+   .slider {
+    position: relative;
+    width: 100%;
+  }
+  
+  .slider__track,
+  .slider__range {
+    position: absolute;
+    height: 6px;
+    border-radius: 3px;
+  }
+  
+  .slider__track {
+    background-color: #e0e0e0;
+    width: 100%;
+    z-index: 1;
+  }
+  
+  .slider__range {
+    background-color: #543c52;
+    z-index: 2;
+  }
+  
+  .thumb {
+    pointer-events: none;
+    position: absolute;
+    height: 0;
+    width: 100%;
+    outline: none;
+  }
+  
+  .thumb--left {
+    z-index: 3;
+  }
+  
+  .thumb--right {
+    z-index: 4;
+  }
+  
+  .thumb::-webkit-slider-thumb {
+    background-color: #543c52;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    height: 18px;
+    width: 18px;
+    margin-top: 4px;
+    pointer-events: all;
+    position: relative;
+  }
+  
+  .thumb::-moz-range-thumb {
+    background-color: #543c52;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    height: 18px;
+    width: 18px;
+    margin-top: 4px;
+    pointer-events: all;
+    position: relative;
+  }
