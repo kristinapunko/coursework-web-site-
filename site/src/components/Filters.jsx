@@ -113,7 +113,7 @@ const Filters = () => {
     : "Оберіть дату";
 
   const Dropdown = ({ id, icon, label, value, options, onChange, containerClass = "w-full" }) => (
-    <div className={`relative ${containerClass}`}>
+    <div className={`relative ${openDropdown === id ? "z-40" : "z-0"} ${containerClass}`}>
       <div
         className="flex items-center gap-3 p-2 lg:p-4 bg-white shadow-md rounded-lg cursor-pointer"
         onClick={() => toggleDropdown(id)}
@@ -125,7 +125,7 @@ const Filters = () => {
         </div>
       </div>
       {openDropdown === id && (
-        <div className="absolute left-0 mt-2 w-full bg-white shadow-lg rounded-lg z-10 max-h-60 overflow-y-auto">
+        <div className="absolute left-0 z-50 mt-2 max-h-60 w-full overflow-y-auto rounded-lg bg-white shadow-lg">
           {options.map((option) => (
             <p
               key={option}
@@ -141,7 +141,7 @@ const Filters = () => {
   );
 
   return (
-    <div className="w-[90vw] xl:w-[80vw] mx-auto mt-6 bg-[#361d32]/25 p-4 lg:p-6 rounded-xl shadow-lg">
+    <div className="relative z-30 mx-auto mt-6 w-[90vw] rounded-xl bg-[#361d32]/25 p-4 shadow-lg lg:p-6 xl:w-[80vw]">
       <div className="w-full xl:w-[75vw] mx-auto relative lg:flex items-center mb-3 lg:mb-6 gap-4">
         <div className="w-full lg:flex-1 relative flex items-center">
           <input

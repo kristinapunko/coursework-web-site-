@@ -18,6 +18,8 @@ const AgencyReviews = () => {
   const [hoveredRating, setHoveredRating] = useState(0);
   const [replyForm, setReplyForm] = useState({ reviewId: null, comment: '' });
   const [editingReview, setEditingReview] = useState(null); // Track the review being edited
+  const [formError, setFormError] = useState('');
+  const [replyError, setReplyError] = useState('');
 
   useEffect(() => {
     dispatch(fetchAgencyReviews());
@@ -36,82 +38,81 @@ const AgencyReviews = () => {
     setHoveredRating(0);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setFormError('');
     if (formData.rating === 0 || !formData.comment.trim()) {
-      alert('Будь ласка, вкажіть рейтинг та коментар');
+      setFormError('Будь ласка, вкажіть рейтинг та коментар.');
       return;
     }
 
-    if (editingReview) {
-      // Update existing review
-      dispatch(updateAgencyReview({
-        agencyReviewId: editingReview.id,
-        reviewData: {
-          rating: formData.rating,
-          feedback: formData.comment,
-          pros: formData.pros,
-          cons: formData.cons,
-        },
-      }))
-        .unwrap()
-        .then(() => {
-          setEditingReview(null);
-          setFormData({ rating: 0, comment: '', pros: '', cons: '' });
-        })
-        .catch((err) => {
-          console.error('Failed to update review:', err);
-          alert(`Не вдалося оновити відгук: ${JSON.stringify(err)}`);
-        });
-    } else {
-      dispatch(addAgencyReview({ reviewData: formData }))
-        .unwrap()
-        .then(() => {
-          setFormData({ rating: 0, comment: '', pros: '', cons: '' });
-        })
-        .catch((err) => {
-          console.error('Failed to add review:', err);
-        });
+    try {
+      if (editingReview) {
+        await dispatch(updateAgencyReview({
+          agencyReviewId: editingReview.id,
+          reviewData: {
+            rating: formData.rating,
+            feedback: formData.comment,
+            pros: formData.pros,
+            cons: formData.cons,
+          },
+        })).unwrap();
+        setEditingReview(null);
+      } else {
+        await dispatch(addAgencyReview({ reviewData: formData })).unwrap();
+      }
+      setFormData({ rating: 0, comment: '', pros: '', cons: '' });
+    } catch (mutationError) {
+      setFormError(String(mutationError || 'Не вдалося зберегти відгук.'));
     }
   };
 
   const handleReplyClick = (reviewId) => {
     setReplyForm({ reviewId, comment: '' });
+    setReplyError('');
+    setReplyError('');
   };
 
   const handleReplyChange = (e) => {
     setReplyForm({ ...replyForm, comment: e.target.value });
   };
 
-  const handleReplySubmit = (e, agencyReviewId) => {
+  const handleReplySubmit = async (e, agencyReviewId) => {
     e.preventDefault();
+    setReplyError('');
     if (!replyForm.comment.trim()) {
-      alert('Будь ласка, введіть відповідь');
+      setReplyError('Будь ласка, введіть відповідь.');
       return;
     }
-    dispatch(addAgencyReply({ agencyReviewId, reviewData: { comment: replyForm.comment } }))
-      .unwrap()
-      .then(() => {
-        setReplyForm({ reviewId: null, comment: '' });
-      })
-      .catch((err) => {
-        console.error('Failed to add reply:', err);
-        alert(`Не вдалося додати відповідь: ${JSON.stringify(err)}`);
-      });
+    try {
+      await dispatch(addAgencyReply({
+        agencyReviewId,
+        reviewData: { comment: replyForm.comment },
+      })).unwrap();
+      setReplyForm({ reviewId: null, comment: '' });
+    } catch (mutationError) {
+      setReplyError(String(mutationError || 'Не вдалося додати відповідь.'));
+    }
   };
 
   const handleReplyCancel = () => {
     setReplyForm({ reviewId: null, comment: '' });
+    setReplyError('');
   };
 
-  const handleDelete = (agencyReviewId) => {
+  const handleDelete = async (agencyReviewId) => {
     if (window.confirm('Ви впевнені, що хочете видалити цей відгук?')) {
-      dispatch(deleteAgencyReview({ agencyReviewId }));
+      try {
+        await dispatch(deleteAgencyReview({ agencyReviewId })).unwrap();
+      } catch (mutationError) {
+        setFormError(String(mutationError || 'Не вдалося видалити відгук.'));
+      }
     }
   };
 
   const handleEdit = (review) => {
     setEditingReview(review);
+    setFormError('');
     setFormData({
       rating: review.rating,
       comment: review.feedback,
@@ -123,6 +124,8 @@ const AgencyReviews = () => {
   const handleCancelEdit = () => {
     setEditingReview(null);
     setFormData({ rating: 0, comment: '', pros: '', cons: '' });
+    setFormError('');
+    setFormError('');
   };
 
   if (loading) return <Loading/>;
@@ -132,7 +135,7 @@ const AgencyReviews = () => {
   return (
     <main>
       <h1 className="text-2xl md:text-3xl font-semibold text-[#361d32] text-center my-9 lg:my-12">
-        Відгуки про турагенство
+        Відгуки про турагентство
       </h1>
       {agencyReviews.length > 0 ? (
         agencyReviews.map((agencyReview) => (
@@ -168,11 +171,12 @@ const AgencyReviews = () => {
                 </button>
               </div>
             )}
-            <div className="flex gap-1 mt-1">
+            <div className="flex gap-1 mt-1" aria-label={`Оцінка ${agencyReview.rating} з 5`}>
               {[1, 2, 3, 4, 5].map((star) => (
                 <FaStar
                   key={star}
                   size={16}
+                  aria-hidden="true"
                   className={star <= agencyReview.rating ? 'text-[#f55951]' : 'text-[#edd2cb]'}
                 />
               ))}
@@ -206,20 +210,26 @@ const AgencyReviews = () => {
 
             {replyForm.reviewId === agencyReview.id && (
               <div className="mt-4">
+                <label className="block text-sm font-medium text-[#543c52]" htmlFor={`agency-reply-${agencyReview.id}`}>
+                  Ваша відповідь
+                </label>
                 <textarea
-                  className="w-full p-2 border-b-2 border-[#543c52]/50 focus:outline-none rounded-md"
-                  placeholder="Ваша відповідь"
+                  id={`agency-reply-${agencyReview.id}`}
+                  className="w-full p-2 border-b-2 border-[#543c52]/50 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                   value={replyForm.comment}
                   onChange={handleReplyChange}
                 />
+                {replyError && <p className="mt-2 text-sm text-red-600" role="alert">{replyError}</p>}
                 <div className="flex justify-end gap-2 mt-2">
                   <button
+                    type="button"
                     onClick={(e) => handleReplySubmit(e, agencyReview.id)}
                     className="px-4 py-2 bg-[#543c52] hover:bg-[#361d32] text-[#f1e8e6] rounded-md"
                   >
                     Надіслати
                   </button>
                   <button
+                    type="button"
                     onClick={handleReplyCancel}
                     className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-[#361d32] rounded-md"
                   >
@@ -266,42 +276,51 @@ const AgencyReviews = () => {
           <h3 className="text-lg font-semibold text-[#543c52] mb-2">
             {editingReview ? 'Редагувати відгук' : 'Додати відгук'}
           </h3>
+          <label className="mt-2 block text-sm font-medium text-[#543c52]" htmlFor="agency-review-comment">Ваш відгук</label>
           <textarea
-            className="w-full mt-2 p-2 border-b-2 border-[#543c52]/50 focus:outline-none rounded-md"
-            placeholder="Ваш відгук"
+            id="agency-review-comment"
+            className="w-full mt-2 p-2 border-b-2 border-[#543c52]/50 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
             value={formData.comment}
             onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
           />
+          <label className="mt-2 block text-sm font-medium text-[#543c52]" htmlFor="agency-review-pros">Переваги</label>
           <textarea
-            className="w-full mt-2 p-2 border-b-2 border-[#543c52]/50 focus:outline-none rounded-md"
-            placeholder="Переваги"
+            id="agency-review-pros"
+            className="w-full mt-2 p-2 border-b-2 border-[#543c52]/50 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
             value={formData.pros}
             onChange={(e) => setFormData({ ...formData, pros: e.target.value })}
           />
+          <label className="mt-2 block text-sm font-medium text-[#543c52]" htmlFor="agency-review-cons">Недоліки</label>
           <textarea
-            className="w-full mt-2 p-2 border-b-2 border-[#543c52]/50 focus:outline-none rounded-md"
-            placeholder="Недоліки"
+            id="agency-review-cons"
+            className="w-full mt-2 p-2 border-b-2 border-[#543c52]/50 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
             value={formData.cons}
             onChange={(e) => setFormData({ ...formData, cons: e.target.value })}
           />
-          <div className="flex gap-1 mt-2">
+          <div className="flex gap-1 mt-2" role="group" aria-label="Оцінка турагентства">
             {[1, 2, 3, 4, 5].map((star) => (
-              <FaStar
+              <button
+                type="button"
                 key={star}
-                size={20}
-                className={
-                  star <= (hoveredRating || formData.rating)
-                    ? 'text-[#f55951] cursor-pointer'
-                    : 'text-[#edd2cb] cursor-pointer'
-                }
+                aria-label={`${star} з 5`}
+                aria-pressed={formData.rating === star}
+                className="rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                 onClick={() => handleStarClick(star)}
                 onMouseEnter={() => handleStarHover(star)}
                 onMouseLeave={handleStarLeave}
-              />
+              >
+                <FaStar
+                  size={20}
+                  aria-hidden="true"
+                  className={star <= (hoveredRating || formData.rating) ? 'text-[#f55951]' : 'text-[#edd2cb]'}
+                />
+              </button>
             ))}
           </div>
+          {formError && <p className="mt-2 text-sm text-red-600" role="alert">{formError}</p>}
           <div className="flex gap-2 mt-3">
             <button
+              type="button"
               onClick={handleSubmit}
               className="w-full bg-[#543c52] hover:bg-[#361d32] text-[#f1e8e6] p-2 rounded-2xl"
             >
@@ -309,6 +328,7 @@ const AgencyReviews = () => {
             </button>
             {editingReview && (
               <button
+                type="button"
                 onClick={handleCancelEdit}
                 className="w-full bg-gray-300 hover:bg-gray-400 text-[#361d32] p-2 rounded-2xl"
               >

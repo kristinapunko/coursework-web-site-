@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchTourById } from '../features/tours/toursSlice';
@@ -17,6 +17,7 @@ const TourDescription = () => {
   const dispatch = useDispatch();
   const toursState = useSelector((state) => state.tours);
   const detailsState = useSelector((state) => state.tourDetails);
+  const [actionMessage, setActionMessage] = useState('');
   const { isLoggedIn, user } = useSelector((state) => state.auth);
   const likedTourIds = useSelector(selectLikedTourIds);
   const reviews = useSelector((state) => state.reviews.reviews);
@@ -53,12 +54,17 @@ const TourDescription = () => {
     return dispatch(sendBookingRequest({ tourId: tour.id, bookingData })).unwrap();
   };
 
-  const handleToggleLike = () => {
+  const handleToggleLike = async () => {
     if (!isLoggedIn) {
-      alert('Будь ласка, увійдіть до системи, щоб додавати тури до улюблених');
+      setActionMessage('Будь ласка, увійдіть до системи, щоб додавати тури до улюблених.');
       return;
     }
-    dispatch(toggleLike(tour.id)).unwrap();
+    setActionMessage('');
+    try {
+      await dispatch(toggleLike(tour.id)).unwrap();
+    } catch (error) {
+      setActionMessage(String(error || 'Не вдалося оновити улюблені тури.'));
+    }
   };
 
   if (toursState.loading || detailsState.loading) return <Loading />;
@@ -82,6 +88,7 @@ const TourDescription = () => {
       )}
 
       <div className="container mx-auto p-2 md:p-4">
+        {actionMessage && <p className="mb-4 rounded-lg bg-amber-50 p-3 text-center text-amber-900" role="status">{actionMessage}</p>}
         <h1 className="text-2xl md:text-3xl font-bold text-[#361d32] text-center mb-2 md:mb-4">
           {tour.name}
         </h1>

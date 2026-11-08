@@ -9,6 +9,7 @@ import Loading from './ui/Loading';
 
 const TourList = ({ tours }) => {
   const [more, setMore] = useState(false);
+  const [notice, setNotice] = useState('');
   const dispatch = useDispatch();
   const location = useLocation();
 
@@ -28,16 +29,17 @@ const TourList = ({ tours }) => {
   
   const handleToggleLike = (tourId) => {
     if (!isLoggedIn) {
-      alert('Будь ласка, увійдіть до системи, щоб додавати тури до улюблених');
+      setNotice('Будь ласка, увійдіть до системи, щоб додавати тури до улюблених.');
       return;
     }
+    setNotice('');
     dispatch(toggleLike(tourId)).unwrap().catch((error) => {
-      if (error.message.includes('401')) {
+      if (String(error).includes('401')) {
         localStorage.removeItem('accessToken');
         dispatch(checkLoggedInUser());
-        alert('Сесія закінчилася. Будь ласка, увійдіть знову.');
+        setNotice('Сесія закінчилася. Будь ласка, увійдіть знову.');
       } else {
-        alert('Сталася помилка. Будь ласка, спробуйте ще раз.');
+        setNotice('Сталася помилка. Будь ласка, спробуйте ще раз.');
       }
     });
   };
@@ -90,6 +92,7 @@ const TourList = ({ tours }) => {
     if (detailsLoading) return <Loading/>
   return (
     <div className="container mx-auto px-4 py-6">
+      {notice && <p className="mb-4 rounded-lg bg-amber-50 p-3 text-center text-amber-900" role="status">{notice}</p>}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {displayedTours.map((tour) => {
           const isLiked = likedTourIds.includes(tour.id);

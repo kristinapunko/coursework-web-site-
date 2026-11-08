@@ -15,7 +15,7 @@ const LikeButton = ({ liked, onClick, tour, disabled = false }) => {
         onClick(tour);
       }
     } else if (!isLoggedIn) {
-      alert('Будь ласка, увійдіть до системи, щоб додавати тури до улюблених');
+      onClick?.(tour);
     }
   };  
 

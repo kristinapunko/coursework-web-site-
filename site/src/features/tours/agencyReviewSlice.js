@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import api from '../../api/client';
+import { getApiErrorMessage } from '../../utils/apiErrors';
 
 const initialState = {
   loading: false,
@@ -15,7 +16,7 @@ export const fetchAgencyReviews = createAsyncThunk(
       const response = await api.get('/tours/agency-reviews/');
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.detail || error.message || 'Failed to fetch reviews');
+      return rejectWithValue(getApiErrorMessage(error, 'Не вдалося завантажити відгуки.'));
     }
   }
 );
@@ -33,7 +34,7 @@ export const fetchAgencyReply = createAsyncThunk(
       }, {});
       return repliesByReview;
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to fetch replies');
+      return rejectWithValue(getApiErrorMessage(error, 'Не вдалося завантажити відповіді.'));
     }
   }
 );
@@ -55,7 +56,7 @@ export const addAgencyReview = createAsyncThunk(
       );
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.detail || error.message || 'Failed to add review');
+      return rejectWithValue(getApiErrorMessage(error, 'Не вдалося додати відгук.'));
     }
   }
 );
@@ -74,7 +75,7 @@ export const addAgencyReply = createAsyncThunk(
       );
       return { reviewId: agencyReviewId, reply: response.data };
     } catch (error) {
-      return rejectWithValue(error.response?.data?.detail || error.response?.data || error.message || 'Failed to add reply');
+      return rejectWithValue(getApiErrorMessage(error, 'Не вдалося додати відповідь.'));
     }
   }
 );
@@ -97,7 +98,7 @@ export const updateAgencyReview = createAsyncThunk(
         );
         return response.data;
       } catch (error) {
-        return rejectWithValue(error.response?.data?.detail || error.message || 'Failed to update review');
+        return rejectWithValue(getApiErrorMessage(error, 'Не вдалося оновити відгук.'));
       }
     }
   );
@@ -112,7 +113,7 @@ export const deleteAgencyReview = createAsyncThunk(
         await api.delete(`/tours/agency-reviews/${agencyReviewId}/`);
         return agencyReviewId; 
       } catch (error) {
-        return rejectWithValue(error.response?.data?.detail || error.message || 'Failed to delete review');
+        return rejectWithValue(getApiErrorMessage(error, 'Не вдалося видалити відгук.'));
       }
     }
   );
@@ -153,9 +154,8 @@ const reviewsSlice = createSlice({
         state.loading = false;
         state.agencyReviews.push(action.payload);
       })
-      .addCase(addAgencyReview.rejected, (state, action) => {
+      .addCase(addAgencyReview.rejected, (state) => {
         state.loading = false;
-        state.error = action.payload;
       })
       .addCase(addAgencyReply.pending, (state) => {
         state.loading = true;
@@ -166,9 +166,8 @@ const reviewsSlice = createSlice({
         if (!state.reply[reviewId]) state.reply[reviewId] = [];
         state.reply[reviewId].push(reply);
       })
-      .addCase(addAgencyReply.rejected, (state, action) => {
+      .addCase(addAgencyReply.rejected, (state) => {
         state.loading = false;
-        state.error = action.payload;
       })
       .addCase(updateAgencyReview.fulfilled, (state, action) => {
         const index = state.agencyReviews.findIndex((r) => r.id === action.payload.id);

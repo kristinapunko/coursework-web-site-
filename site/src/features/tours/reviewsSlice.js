@@ -1,6 +1,7 @@
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import api from '../../api/client';
+import { getApiErrorMessage } from '../../utils/apiErrors';
 
 const initialState = {
     loading: false,
@@ -9,7 +10,7 @@ const initialState = {
 };
 
 export const addReview = createAsyncThunk(
-    'reviwes/addReview',
+    'reviews/addReview',
     async ({ tourId, reviewData }, { rejectWithValue }) => {
         try {
             const token = localStorage.getItem('accessToken');
@@ -25,7 +26,7 @@ export const addReview = createAsyncThunk(
           );
             return response.data;
         } catch (error) {
-            return rejectWithValue(error.response?.data?.detail || error.message || 'Booking request failed');
+            return rejectWithValue(getApiErrorMessage(error, 'Не вдалося додати відгук.'));
         }
     }
 );
@@ -42,7 +43,7 @@ export const fetchReviews = createAsyncThunk(
       });
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(getApiErrorMessage(error, 'Не вдалося завантажити відгуки.'));
     }
   },
   {
@@ -51,7 +52,7 @@ export const fetchReviews = createAsyncThunk(
 );
 
 export const updateReview = createAsyncThunk(
-    'reviwes/updateReview',
+    'reviews/updateReview',
     async ({reviewId, reviewData}, { rejectWithValue }) => {
         try {
             const token = localStorage.getItem('accessToken');
@@ -66,7 +67,7 @@ export const updateReview = createAsyncThunk(
           );
             return response.data;
         } catch (error) {
-            return rejectWithValue(error.response?.data?.detail || error.message || 'Failed to update review');
+            return rejectWithValue(getApiErrorMessage(error, 'Не вдалося оновити відгук.'));
         }
     }
 );
@@ -81,7 +82,7 @@ export const deleteReview = createAsyncThunk(
         await api.delete(`/tours/reviews/${reviewId}/`);
         return reviewId; 
       } catch (error) {
-        return rejectWithValue(error.response?.data?.detail || error.message || 'Failed to delete review');
+        return rejectWithValue(getApiErrorMessage(error, 'Не вдалося видалити відгук.'));
       }
     }
   );
@@ -100,6 +101,7 @@ const reviewsSlice = createSlice({
           })
           .addCase(fetchReviews.fulfilled, (state, action) => {
             state.loading = false;
+            state.error = null;
             state.reviews = action.payload;
           })
           .addCase(fetchReviews.rejected, (state, action) => {
@@ -108,10 +110,12 @@ const reviewsSlice = createSlice({
           })
           // Add review
           .addCase(addReview.fulfilled, (state, action) => {
+            state.error = null;
             state.reviews.push(action.payload);
           })
           // Update review
           .addCase(updateReview.fulfilled, (state, action) => {
+            state.error = null;
             const index = state.reviews.findIndex((r) => r.id === action.payload.id);
             if (index !== -1) {
               state.reviews[index] = action.payload;
@@ -120,7 +124,8 @@ const reviewsSlice = createSlice({
           // Delete review
           .addCase(deleteReview.fulfilled, (state, action) => {
             state.reviews = state.reviews.filter((r) => r.id !== action.payload);
-  state.loading = false;
+            state.error = null;
+            state.loading = false;
           });
       },
     });

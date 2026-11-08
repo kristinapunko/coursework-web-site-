@@ -62,7 +62,7 @@
 | `travel_start_date`, `travel_end_date` | Повинні входити у період туру |
 | `adults`, `children` | Сума не перевищує `available_seats` |
 | `contact_*` | Перевірені контактні дані |
-| `total_price` | Розраховується сервером з актуальної ціни туру |
+| `total_price` | Актуальна ціна на одного гостя × сумарна кількість дорослих і дітей; розраховується сервером |
 | `status` | `pending`, `confirmed` або `canceled` |
 | `created_at` | Серверний timestamp |
 
@@ -130,8 +130,8 @@ Booking.status → confirmed
 ### 5.3. Скасування
 
 1. Клієнт відкриває власні бронювання.
-2. UI показує можливість скасування лише до 14-денної межі.
-3. Backend повторно застосовує правило незалежно від UI.
+2. UI показує можливість скасування лише для неоплаченого `pending`-бронювання до 14-денної межі.
+3. Backend повторно застосовує правила статусу і дати незалежно від UI.
 4. Статус змінюється на `canceled`, а місця повертаються один раз.
 
 ### 5.4. Оплата
@@ -171,10 +171,11 @@ Frontend і backend з'єднані HTTP/JSON-контрактом. Компон
 4. Кількість гостей не перевищує доступні місця.
 5. Повторне збереження існуючого booking не резервує місця вдруге.
 6. Повторне скасування не повертає місця повторно.
-7. Рейтинг має діапазон 1–5.
-8. Змінювати review може лише його власник; reply створює лише admin.
-9. Оплата не підтверджується лише за browser status.
-10. Callback signature, `order_id` і сума мають збігатися з payment record.
+7. Оплачене або `confirmed`-бронювання не можна скасувати без окремого refund workflow.
+8. Рейтинг має діапазон 1–5.
+9. Змінювати review може лише його власник; reply створює лише admin.
+10. Оплата не підтверджується лише за browser status.
+11. Callback signature, `order_id` і сума мають збігатися з payment record.
 
 ---
 
@@ -187,7 +188,7 @@ Frontend і backend з'єднані HTTP/JSON-контрактом. Компон
 | Продуктивність | `select_related`, `prefetch_related`, annotated review summary, memoized selectors |
 | Надійність | Backend validation дублює критичні frontend checks |
 | Відтворюваність | Pinned Python packages, package lock, Docker Compose |
-| Тестованість | 19 backend і 29 frontend automated tests |
+| Тестованість | 21 backend і 38 frontend automated tests |
 | Підтримуваність | Domain apps, Redux feature modules, shared API client |
 
 ---

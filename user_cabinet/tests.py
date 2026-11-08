@@ -110,12 +110,44 @@ class BookingAPITests(APITestCase):
         self.tour.refresh_from_db()
         self.assertEqual(self.tour.available_seats, 9)
 
+    def test_total_price_uses_effective_price_for_every_guest(self):
+        booking = self.create_booking(adults=2, children=1)
+        self.assertEqual(booking.total_price, Decimal("3000.00"))
+        self.tour.refresh_from_db()
+        self.assertEqual(self.tour.available_seats, 7)
+
+        self.tour.promotion = True
+        self.tour.price_promotion = Decimal("750.00")
+        self.tour.save(update_fields=["promotion", "price_promotion"])
+        promotional_booking = Booking.objects.create(
+            user=self.other_user,
+            tour=self.tour,
+            travel_start_date=self.tour.start_date,
+            travel_end_date=self.tour.end_date,
+            adults=2,
+            contact_name="Other customer",
+            contact_email="other-booker@example.com",
+            contact_phone="+380501112244",
+        )
+        self.assertEqual(promotional_booking.total_price, Decimal("1500.00"))
+
     def test_cancel_is_idempotent_and_restores_one_seat(self):
         booking = self.create_booking()
         self.assertTrue(booking.cancel_booking())
         self.assertTrue(booking.cancel_booking())
         self.tour.refresh_from_db()
         self.assertEqual(self.tour.available_seats, 10)
+
+    def test_confirmed_booking_cannot_be_canceled_or_restore_seats(self):
+        booking = self.create_booking()
+        booking.status = "confirmed"
+        booking.save(update_fields=["status"])
+
+        self.assertFalse(booking.cancel_booking())
+        booking.refresh_from_db()
+        self.tour.refresh_from_db()
+        self.assertEqual(booking.status, "confirmed")
+        self.assertEqual(self.tour.available_seats, 9)
 
     def test_booking_fails_when_no_seats_remain(self):
         self.tour.available_seats = 0

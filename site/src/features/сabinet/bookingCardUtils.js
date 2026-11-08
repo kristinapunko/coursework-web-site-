@@ -21,7 +21,7 @@ export const getUkrainianDayLabel = (days) => {
 };
 
 export const canCancelBooking = (status, daysRemaining) => (
-  status !== 'canceled'
+  status === 'pending'
   && daysRemaining !== null
   && daysRemaining >= 14
 );

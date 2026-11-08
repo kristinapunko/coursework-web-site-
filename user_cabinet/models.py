@@ -52,7 +52,7 @@ class Booking(models.Model):
         ]
 
     def can_cancel(self):
-        return self.status != "canceled" and (
+        return self.status == "pending" and (
             self.tour.start_date - timezone.now().date()
         ) >= timedelta(days=14)
 
@@ -80,9 +80,10 @@ class Booking(models.Model):
         with transaction.atomic():
             if self._state.adding and self.status != "canceled":
                 if not self.total_price:
-                    self.total_price = (
+                    unit_price = (
                         self.tour.price_promotion if self.tour.promotion else self.tour.price
                     )
+                    self.total_price = Decimal(str(unit_price)) * self.guest_count
                 updated = TourDescription.objects.filter(
                     pk=self.tour_id, available_seats__gte=self.guest_count
                 ).update(available_seats=F("available_seats") - self.guest_count)

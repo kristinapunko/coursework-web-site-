@@ -154,8 +154,8 @@ Route-level сторінки координують data loading і mutation cal
 
 ### `dispatch(cancelBooking(bookingId))`
 
-* Відправник: Booking card після client-side 14-day check і `confirm`.
-* Backend authority: повторно перевіряє правило та ownership.
+* Відправник: Booking card після client-side `pending` status/14-day check і `confirm`.
+* Backend authority: повторно перевіряє status, дату та ownership.
 * Результат: локальний status змінюється на `canceled` лише після успішної відповіді.
 
 ### `onPaymentComplete()`
@@ -216,7 +216,7 @@ WHERE id = tour_id AND available_seats >= guest_count
 
 Якщо жоден рядок не оновлено, створення припиняється. Це захищає від overbooking за конкурентних запитів краще, ніж окрема read-then-write перевірка.
 
-Під час скасування booking і tour блокуються/оновлюються у транзакції. Повторний виклик є idempotent.
+Під час скасування booking і tour блокуються/оновлюються у транзакції. Скасувати можна лише неоплачений `pending` booking; повторний виклик для вже скасованого booking є idempotent.
 
 ---
 

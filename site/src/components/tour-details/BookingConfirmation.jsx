@@ -1,3 +1,5 @@
+import { formatPrice } from '../../utils/utils';
+
 const BookingConfirmation = ({ booking, tour, onClose }) => (
   <section className="rounded-2xl bg-[#f1e8e6] p-5 text-[#361d32]" role="status">
     <div className="mb-4 text-center text-4xl" aria-hidden="true">✓</div>
@@ -8,6 +10,7 @@ const BookingConfirmation = ({ booking, tour, onClose }) => (
       <dt className="font-semibold">Номер заявки</dt><dd>#{booking.id}</dd>
       <dt className="font-semibold">Дати</dt><dd>{booking.travel_start_date} — {booking.travel_end_date}</dd>
       <dt className="font-semibold">Гості</dt><dd>{booking.adults} дор., {booking.children} дит.</dd>
+      <dt className="font-semibold">Загальна сума</dt><dd>{formatPrice(booking.total_price)} грн</dd>
       <dt className="font-semibold">Контакт</dt><dd>{booking.contact_name}</dd>
       <dt className="font-semibold">Email</dt><dd>{booking.contact_email}</dd>
       <dt className="font-semibold">Телефон</dt><dd>{booking.contact_phone}</dd>

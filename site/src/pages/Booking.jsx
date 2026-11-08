@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { cancelBooking, fetchBookings } from '../features/сabinet/bookingSlice';
 import {
@@ -20,6 +20,7 @@ const Booking = () => {
     const userId = useSelector((state) => state.auth.user?.id);
     const loading = useSelector((state) => state.booking.loading);
     const error = useSelector((state) => state.booking.error);
+    const [notice, setNotice] = useState('');
 
     useEffect(() => {
         if (userId) {
@@ -29,19 +30,20 @@ const Booking = () => {
 
     const handleCancelBooking = (bookingId, daysRemaining) => {
         if (daysRemaining === null) {
-            alert("Інформація про дату туру ще завантажується. Спробуйте ще раз.");
+            setNotice("Інформація про дату туру ще завантажується. Спробуйте ще раз.");
             return;
         }
         if (daysRemaining < 14) {
-            alert("Скасування неможливе менш ніж за 14 днів до початку туру.");
+            setNotice("Скасування неможливе менш ніж за 14 днів до початку туру.");
             return;
         }
-        const isSure = confirm("Ви впевнені що хочите скасувати тур? Йобо буде неможливо відновити.");
+        setNotice('');
+        const isSure = confirm("Ви впевнені, що хочете скасувати бронювання? Його буде неможливо відновити.");
         if (isSure) {
             dispatch(cancelBooking(bookingId))
                 .unwrap()
                 .catch((err) => {
-                    console.error('Помилка при скасуванні:', err);
+                    setNotice(String(err || 'Не вдалося скасувати бронювання.'));
                 });
         }
 
@@ -50,7 +52,20 @@ const Booking = () => {
     const handlePaymentComplete = () => dispatch(fetchBookings());
 
     if (loading) return <Loading />;
-    if (error) return <p>{error?.message || "Something went wrong"}</p>;
+    if (error) {
+        return (
+            <div className="mx-auto my-8 max-w-xl rounded-xl border border-red-200 bg-red-50 p-4 text-center">
+                <p className="text-red-700" role="alert">{String(error)}</p>
+                <button
+                    type="button"
+                    className="mt-3 rounded-lg bg-[#543c52] px-4 py-2 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                    onClick={() => dispatch(fetchBookings())}
+                >
+                    Спробувати ще раз
+                </button>
+            </div>
+        );
+    }
 
     if (!bookings || bookings.length === 0) {
         return (
@@ -66,6 +81,7 @@ const Booking = () => {
     return (
         <div className="container max-w-8xl mx-auto my-6 px-4">
             <h1 className="capitalize text-[#361d32] text-xl lg:text-3xl font-semibold mb-6">Ваші бронювання</h1>
+            {notice && <p className="mb-4 rounded-lg bg-amber-50 p-3 text-center text-amber-900" role="status">{notice}</p>}
 
             <div className="space-y-6">
                 {bookings.map((booking) => {
@@ -129,7 +145,7 @@ const Booking = () => {
 
                                     <div className="mt-3 md:mt-6 pt-4 border-t border-[#f1e8e6]">
                                         <p className="text-sm text-[#543c52] italic mb-4">
-                                            Скасування можливе за 14 днів до початку туру
+                                            Неоплачене бронювання можна скасувати не пізніше ніж за 14 днів до початку туру
                                         </p>
 
                                         <div className="flex gap-3">

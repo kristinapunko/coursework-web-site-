@@ -128,7 +128,33 @@ describe('TourDescription booking flow', () => {
 
     expect(screen.getByText('Вкажіть коректну електронну адресу.')).toBeInTheDocument();
     expect(screen.getByText('Вкажіть коректний номер телефону.')).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Email/)).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText(/^Email/)).toHaveAttribute('aria-describedby', 'contact-email-error');
+    expect(screen.getByLabelText(/^Email/)).toHaveFocus();
     expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('shows localized date pickers constrained to the tour period', async () => {
+    const { user } = renderBookingFlow({ authenticated: true });
+    await openBookingForm(user);
+
+    expect(screen.getByLabelText('Дата початку')).toHaveValue('01.06.2099');
+    expect(screen.getByLabelText('Дата завершення')).toHaveValue('10.06.2099');
+  });
+
+  it('keeps entered booking data when the API rejects the request', async () => {
+    localStorage.setItem('accessToken', 'test-token');
+    api.post.mockRejectedValue({
+      response: { data: { contact_phone: ['Цей номер не підходить.'] } },
+    });
+    const { user } = renderBookingFlow({ authenticated: true });
+    const submitButton = await openBookingForm(user);
+    await enterPhone(user);
+
+    await user.click(submitButton);
+
+    expect(await screen.findByText('Телефон: Цей номер не підходить.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Телефон')).toHaveValue('+380501112233');
   });
 
   it('validates authentication without dispatching', async () => {
@@ -169,6 +195,7 @@ describe('TourDescription booking flow', () => {
       contact_name: 'traveler',
       contact_email: 'traveler@example.com',
       contact_phone: '+380501112233',
+      total_price: '25000.00',
     };
     api.post.mockResolvedValue({ data: bookingResponse });
     const { store, user } = renderBookingFlow({ authenticated: true });

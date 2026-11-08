@@ -11,7 +11,7 @@ describe('booking card date helpers', () => {
 
     expect(getDaysRemaining('2027-05-15', today)).toBe(14);
     expect(canCancelBooking('pending', 14)).toBe(true);
-    expect(canCancelBooking('confirmed', 14)).toBe(true);
+    expect(canCancelBooking('confirmed', 14)).toBe(false);
     expect(canCancelBooking('pending', 13)).toBe(false);
     expect(canCancelBooking('canceled', 14)).toBe(false);
   });

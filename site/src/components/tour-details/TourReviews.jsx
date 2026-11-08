@@ -26,11 +26,12 @@ const ReviewCard = ({ review, canEdit, onDelete, onEdit }) => (
           </div>
         )}
       </div>
-      <div className="flex gap-1 mt-1">
+      <div className="flex gap-1 mt-1" aria-label={`Оцінка ${review.rating} з 5`}>
         {[1, 2, 3, 4, 5].map((star) => (
           <FaStar
             key={star}
             size={16}
+            aria-hidden="true"
             className={star <= review.rating ? 'text-[#f55951]' : 'text-[#edd2cb]'}
           />
         ))}
@@ -49,33 +50,41 @@ const ReviewCard = ({ review, canEdit, onDelete, onEdit }) => (
   </div>
 );
 
-const ReviewForm = ({ editingReview, formData, hoveredRating, onCancel, onSubmit, setFormData, setHoveredRating }) => (
+const ReviewForm = ({ editingReview, formData, formError, hoveredRating, onCancel, onSubmit, setFormData, setHoveredRating }) => (
   <div className="mt-4 sm:mt-6 text-left bg-white p-3 sm:p-5 rounded-lg shadow-md">
     <h3 className="text-lg font-semibold text-[#543c52] mb-2">
       {editingReview ? 'Редагувати відгук' : 'Додати відгук'}
     </h3>
+    <label className="block text-sm font-medium text-[#543c52]" htmlFor="tour-review-comment">
+      Ваш відгук
+    </label>
     <textarea
-      className="w-full mt-2 p-2 border-b-2 border-[#543c52]/50 focus:outline-none rounded-md"
-      placeholder="Ваш відгук"
+      id="tour-review-comment"
+      className="w-full mt-2 p-2 border-b-2 border-[#543c52]/50 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
       value={formData.comment}
       onChange={(event) => setFormData({ ...formData, comment: event.target.value })}
     />
-    <div className="flex gap-1 mt-2">
+    <div className="flex gap-1 mt-2" role="group" aria-label="Оцінка туру">
       {[1, 2, 3, 4, 5].map((star) => (
-        <FaStar
+        <button
+          type="button"
           key={star}
-          size={20}
-          className={
-            star <= (hoveredRating || formData.rating)
-              ? 'text-[#f55951] cursor-pointer'
-              : 'text-[#edd2cb] cursor-pointer'
-          }
+          aria-label={`${star} з 5`}
+          aria-pressed={formData.rating === star}
+          className="rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
           onClick={() => setFormData({ ...formData, rating: star })}
           onMouseEnter={() => setHoveredRating(star)}
           onMouseLeave={() => setHoveredRating(0)}
-        />
+        >
+          <FaStar
+            size={20}
+            aria-hidden="true"
+            className={star <= (hoveredRating || formData.rating) ? 'text-[#f55951]' : 'text-[#edd2cb]'}
+          />
+        </button>
       ))}
     </div>
+    {formError && <p className="mt-2 text-sm text-red-600" role="alert">{formError}</p>}
     <div className="flex gap-2 mt-3">
       <button
         className="w-full bg-[#543c52] hover:bg-[#361d32] text-[#f1e8e6] p-2 rounded-2xl"
@@ -102,52 +111,61 @@ const TourReviews = ({ tourId }) => {
   const [formData, setFormData] = useState({ rating: 0, comment: '' });
   const [editingReview, setEditingReview] = useState(null);
   const [hoveredRating, setHoveredRating] = useState(0);
+  const [formError, setFormError] = useState('');
   const visibleReviews = reviews.filter((review) => String(review.tour) === String(tourId));
 
   useEffect(() => {
     dispatch(fetchReviews(tourId));
   }, [dispatch, tourId]);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
+    setFormError('');
     if (formData.rating === 0 || !formData.comment.trim()) {
-      alert('Будь ласка, вкажіть рейтинг та коментар');
+      setFormError('Будь ласка, вкажіть рейтинг та коментар.');
       return;
     }
 
-    if (editingReview) {
-      dispatch(updateReview({
-        reviewId: editingReview.id,
-        reviewData: {
-          tour: editingReview.tour,
-          rating: formData.rating,
-          feedback: formData.comment,
-        },
-      })).then(() => {
+    try {
+      if (editingReview) {
+        await dispatch(updateReview({
+          reviewId: editingReview.id,
+          reviewData: {
+            tour: editingReview.tour,
+            rating: formData.rating,
+            feedback: formData.comment,
+          },
+        })).unwrap();
         setEditingReview(null);
-        setFormData({ rating: 0, comment: '' });
-      });
-      return;
+      } else {
+        await dispatch(addReview({ tourId, reviewData: formData })).unwrap();
+      }
+      setFormData({ rating: 0, comment: '' });
+    } catch (mutationError) {
+      setFormError(String(mutationError || 'Не вдалося зберегти відгук.'));
     }
-
-    dispatch(addReview({ tourId, reviewData: formData }));
-    setFormData({ rating: 0, comment: '' });
   };
 
   const handleEdit = (review) => {
     setEditingReview(review);
     setFormData({ rating: review.rating, comment: review.feedback });
+    setFormError('');
   };
 
-  const handleDelete = (reviewId) => {
+  const handleDelete = async (reviewId) => {
     if (window.confirm('Ви впевнені, що хочете видалити цей відгук?')) {
-      dispatch(deleteReview({ reviewId }));
+      try {
+        await dispatch(deleteReview({ reviewId })).unwrap();
+      } catch (mutationError) {
+        setFormError(String(mutationError || 'Не вдалося видалити відгук.'));
+      }
     }
   };
 
   const handleCancel = () => {
     setEditingReview(null);
     setFormData({ rating: 0, comment: '' });
+    setFormError('');
   };
 
   if (loading) return <Loading />;
@@ -173,6 +191,7 @@ const TourReviews = ({ tourId }) => {
         <ReviewForm
           editingReview={editingReview}
           formData={formData}
+          formError={formError}
           hoveredRating={hoveredRating}
           onCancel={handleCancel}
           onSubmit={handleSubmit}

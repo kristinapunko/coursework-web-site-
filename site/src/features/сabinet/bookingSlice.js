@@ -1,10 +1,11 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import api from '../../api/client';
+import { getApiErrorMessage } from '../../utils/apiErrors';
 
 const initialState = {
     loading: false,
     bookingStatus: [], 
-    error: "",
+    error: null,
 };
 
 export const sendBookingRequest = createAsyncThunk(
@@ -21,7 +22,7 @@ export const sendBookingRequest = createAsyncThunk(
             });
             return response.data;
         } catch (error) {
-            return rejectWithValue(error.response?.data?.detail || error.message || 'Booking request failed');
+            return rejectWithValue(getApiErrorMessage(error, 'Не вдалося створити бронювання.'));
         }
     }
 );
@@ -36,7 +37,7 @@ export const fetchBookings = createAsyncThunk(
             const response = await api.get('/cabinet/bookings/');
             return response.data;
         } catch (error) {
-            return rejectWithValue(error.response?.data?.detail || error.message || 'Failed to fetch bookings');
+            return rejectWithValue(getApiErrorMessage(error, 'Не вдалося завантажити бронювання.'));
         }
     }
 );
@@ -51,7 +52,7 @@ export const cancelBooking = createAsyncThunk(
             const response = await api.delete(`/cabinet/bookings/${bookingId}/`);
             return { bookingId, message: response.data.message }; // Повертаємо ID для оновлення стану
         } catch (error) {
-            return rejectWithValue(error.response?.data?.error || error.message || 'Failed to cancel booking');
+            return rejectWithValue(getApiErrorMessage(error, 'Не вдалося скасувати бронювання.'));
         }
     }
 );
@@ -62,16 +63,18 @@ const bookingSlice = createSlice({
     reducers: {
         resetStatus: (state) => {
             state.bookingStatus = [];
-            state.error = "";
+            state.error = null;
         },
     },
     extraReducers: (builder) => {
         builder
             .addCase(sendBookingRequest.pending, (state) => {
                 state.loading = true;
+                state.error = null;
             })
             .addCase(sendBookingRequest.fulfilled, (state, action) => {
                 state.loading = false;
+                state.error = null;
                 state.bookingStatus.push(action.payload);
             })
             .addCase(sendBookingRequest.rejected, (state, action) => {
@@ -80,9 +83,11 @@ const bookingSlice = createSlice({
             })
             .addCase(fetchBookings.pending, (state) => {
                 state.loading = true;
+                state.error = null;
             })
             .addCase(fetchBookings.fulfilled, (state, action) => {
                 state.loading = false;
+                state.error = null;
                 state.bookingStatus = action.payload; 
             })
             .addCase(fetchBookings.rejected, (state, action) => {
@@ -91,9 +96,11 @@ const bookingSlice = createSlice({
             })
             .addCase(cancelBooking.pending, (state) => {
                 state.loading = true;
+                state.error = null;
             })
             .addCase(cancelBooking.fulfilled, (state, action) => {
                 state.loading = false;
+                state.error = null;
                 state.bookingStatus = state.bookingStatus.map((booking) =>
                     booking.id === action.payload.bookingId
                         ? { ...booking, status: 'canceled' }

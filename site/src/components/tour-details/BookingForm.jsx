@@ -1,19 +1,49 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   createBookingInitialValues,
   normalizeBookingForm,
   validateBookingForm,
 } from '../../features/сabinet/bookingValidation';
+import BookingContactFields from './booking-form/BookingContactFields';
+import BookingDateFields from './booking-form/BookingDateFields';
+import BookingGuestFields from './booking-form/BookingGuestFields';
+import { serializeDate } from './booking-form/bookingFormUtils';
 
-const FieldError = ({ children }) => (
-  children ? <p className="mt-1 text-sm text-red-600" role="alert">{children}</p> : null
-);
+const FIELD_ORDER = [
+  'travel_start_date',
+  'travel_end_date',
+  'adults',
+  'children',
+  'contact_name',
+  'contact_email',
+  'contact_phone',
+];
 
 const BookingForm = ({ tour, user, onBack, onConfirmed, onSubmit }) => {
   const [values, setValues] = useState(() => createBookingInitialValues(tour, user));
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const fieldRefs = useRef({});
+
+  const registerField = (name) => (node) => {
+    fieldRefs.current[name] = node;
+  };
+
+  const updateDate = (name) => (date) => {
+    setValues((current) => {
+      const next = { ...current, [name]: serializeDate(date) };
+      if (
+        name === 'travel_start_date' &&
+        next.travel_end_date &&
+        next.travel_start_date > next.travel_end_date
+      ) {
+        next.travel_end_date = '';
+      }
+      return next;
+    });
+    setErrors((current) => ({ ...current, [name]: undefined }));
+  };
 
   const updateValue = (event) => {
     const { name, value } = event.target;
@@ -21,12 +51,29 @@ const BookingForm = ({ tour, user, onBack, onConfirmed, onSubmit }) => {
     setErrors((current) => ({ ...current, [name]: undefined, guests: undefined }));
   };
 
+  const focusFirstInvalidField = (validationErrors) => {
+    const firstInvalidField =
+      FIELD_ORDER.find((name) => validationErrors[name]) ||
+      (validationErrors.guests ? 'adults' : null);
+    const firstInvalidControl = fieldRefs.current[firstInvalidField];
+
+    if (typeof firstInvalidControl?.setFocus === 'function') {
+      firstInvalidControl.setFocus();
+    } else {
+      firstInvalidControl?.focus();
+    }
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     const validationErrors = validateBookingForm(values, tour);
     setErrors(validationErrors);
     setSubmitError('');
-    if (Object.keys(validationErrors).length > 0) return;
+
+    if (Object.keys(validationErrors).length > 0) {
+      focusFirstInvalidField(validationErrors);
+      return;
+    }
 
     const bookingData = normalizeBookingForm(values);
     setSubmitting(true);
@@ -41,110 +88,43 @@ const BookingForm = ({ tour, user, onBack, onConfirmed, onSubmit }) => {
   };
 
   return (
-    <form className="flex flex-col gap-4 w-full" onSubmit={handleSubmit} noValidate>
-      <h2 className="text-xl text-center text-[#361d32] font-semibold">Дані бронювання</h2>
+    <form className="flex w-full flex-col gap-4" onSubmit={handleSubmit} noValidate>
+      <h2 className="text-center text-xl font-semibold text-[#361d32]">Дані бронювання</h2>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <label className="text-sm text-[#543c52]">
-          Дата початку
-          <input
-            type="date"
-            name="travel_start_date"
-            min={tour.start_date}
-            max={tour.end_date}
-            value={values.travel_start_date}
-            onChange={updateValue}
-            className="mt-1 w-full rounded-lg border p-2"
-          />
-          <FieldError>{errors.travel_start_date}</FieldError>
-        </label>
-        <label className="text-sm text-[#543c52]">
-          Дата завершення
-          <input
-            type="date"
-            name="travel_end_date"
-            min={tour.start_date}
-            max={tour.end_date}
-            value={values.travel_end_date}
-            onChange={updateValue}
-            className="mt-1 w-full rounded-lg border p-2"
-          />
-          <FieldError>{errors.travel_end_date}</FieldError>
-        </label>
-      </div>
+      <BookingDateFields
+        tour={tour}
+        values={values}
+        errors={errors}
+        onDateChange={updateDate}
+        registerField={registerField}
+      />
+      <BookingGuestFields
+        values={values}
+        errors={errors}
+        onChange={updateValue}
+        registerField={registerField}
+      />
+      <BookingContactFields
+        values={values}
+        errors={errors}
+        onChange={updateValue}
+        registerField={registerField}
+      />
 
-      <div className="grid grid-cols-2 gap-3">
-        <label className="text-sm text-[#543c52]">
-          Дорослі
-          <input
-            type="number"
-            name="adults"
-            min="1"
-            value={values.adults}
-            onChange={updateValue}
-            className="mt-1 w-full rounded-lg border p-2"
-          />
-          <FieldError>{errors.adults}</FieldError>
-        </label>
-        <label className="text-sm text-[#543c52]">
-          Діти
-          <input
-            type="number"
-            name="children"
-            min="0"
-            value={values.children}
-            onChange={updateValue}
-            className="mt-1 w-full rounded-lg border p-2"
-          />
-          <FieldError>{errors.children}</FieldError>
-        </label>
-      </div>
-      <FieldError>{errors.guests}</FieldError>
+      {submitError && (
+        <p className="text-sm text-red-600" role="alert">
+          {submitError}
+        </p>
+      )}
 
-      <label className="text-sm text-[#543c52]">
-        Контактна особа
-        <input
-          type="text"
-          name="contact_name"
-          value={values.contact_name}
-          onChange={updateValue}
-          className="mt-1 w-full rounded-lg border p-2"
-        />
-        <FieldError>{errors.contact_name}</FieldError>
-      </label>
-      <label className="text-sm text-[#543c52]">
-        Email
-        <input
-          type="email"
-          name="contact_email"
-          value={values.contact_email}
-          onChange={updateValue}
-          className="mt-1 w-full rounded-lg border p-2"
-        />
-        <FieldError>{errors.contact_email}</FieldError>
-      </label>
-      <label className="text-sm text-[#543c52]">
-        Телефон
-        <input
-          type="tel"
-          name="contact_phone"
-          value={values.contact_phone}
-          onChange={updateValue}
-          placeholder="+380 00 000 00 00"
-          className="mt-1 w-full rounded-lg border p-2"
-        />
-        <FieldError>{errors.contact_phone}</FieldError>
-      </label>
-
-      {submitError && <p className="text-sm text-red-600" role="alert">{submitError}</p>}
       <button
         type="submit"
         disabled={submitting}
-        className="w-full rounded-2xl bg-[#543c52] py-2 text-[#edd2cb] hover:bg-[#361d32] disabled:opacity-50"
+        className="w-full rounded-2xl bg-[#543c52] py-2.5 font-medium text-[#edd2cb] transition hover:bg-[#361d32] disabled:opacity-50"
       >
         {submitting ? 'Надсилання…' : 'Підтвердити бронювання'}
       </button>
-      <button type="button" className="text-[#361d32] underline" onClick={onBack}>
+      <button type="button" className="text-sm text-[#361d32] underline" onClick={onBack}>
         Назад до інформації
       </button>
     </form>

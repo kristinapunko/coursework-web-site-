@@ -4,6 +4,16 @@ const FIELD_LABELS = {
   password: "Пароль",
   password1: "Пароль",
   password2: "Підтвердження пароля",
+  travel_start_date: "Дата початку",
+  travel_end_date: "Дата завершення",
+  adults: "Дорослі",
+  children: "Діти",
+  contact_name: "Контактна особа",
+  contact_email: "Email",
+  contact_phone: "Телефон",
+  guests: "Гості",
+  rating: "Оцінка",
+  feedback: "Відгук",
 };
 
 const collectMessages = (value) => {
