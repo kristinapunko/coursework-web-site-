@@ -215,7 +215,7 @@ const AgencyReviews = () => {
                 </label>
                 <textarea
                   id={`agency-reply-${agencyReview.id}`}
-                  className="w-full p-2 border-b-2 border-[#543c52]/50 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  className="w-full p-2 border-b-2 border-[#543c52]/50 focus:outline-none focus-visible:outline-none focus:border-[#f55951]"
                   value={replyForm.comment}
                   onChange={handleReplyChange}
                 />
@@ -279,21 +279,21 @@ const AgencyReviews = () => {
           <label className="mt-2 block text-sm font-medium text-[#543c52]" htmlFor="agency-review-comment">Ваш відгук</label>
           <textarea
             id="agency-review-comment"
-            className="w-full mt-2 p-2 border-b-2 border-[#543c52]/50 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            className="w-full mt-2 p-2 border-b-2 border-[#543c52]/50 focus:outline-none focus-visible:outline-none focus:border-[#f55951]"
             value={formData.comment}
             onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
           />
           <label className="mt-2 block text-sm font-medium text-[#543c52]" htmlFor="agency-review-pros">Переваги</label>
           <textarea
             id="agency-review-pros"
-            className="w-full mt-2 p-2 border-b-2 border-[#543c52]/50 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            className="w-full mt-2 p-2 border-b-2 border-[#543c52]/50 focus:outline-none focus-visible:outline-none focus:border-[#f55951]"
             value={formData.pros}
             onChange={(e) => setFormData({ ...formData, pros: e.target.value })}
           />
           <label className="mt-2 block text-sm font-medium text-[#543c52]" htmlFor="agency-review-cons">Недоліки</label>
           <textarea
             id="agency-review-cons"
-            className="w-full mt-2 p-2 border-b-2 border-[#543c52]/50 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            className="w-full mt-2 p-2 border-b-2 border-[#543c52]/50 focus:outline-none focus-visible:outline-none focus:border-[#f55951]"
             value={formData.cons}
             onChange={(e) => setFormData({ ...formData, cons: e.target.value })}
           />

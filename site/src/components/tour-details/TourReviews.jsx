@@ -60,7 +60,7 @@ const ReviewForm = ({ editingReview, formData, formError, hoveredRating, onCance
     </label>
     <textarea
       id="tour-review-comment"
-      className="w-full mt-2 p-2 border-b-2 border-[#543c52]/50 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+      className="w-full mt-2 p-2 border-b-2 border-[#543c52]/50 focus:outline-none focus-visible:outline-none focus:border-[#f55951]"
       value={formData.comment}
       onChange={(event) => setFormData({ ...formData, comment: event.target.value })}
     />
